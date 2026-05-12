@@ -2503,6 +2503,26 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         </div>
       </div>
       <div id="lam-days-preview" style="font-size:13px;color:var(--accent);margin-bottom:12px;min-height:18px"></div>
+      <!-- 病單上傳區：依假別 require_cert 動態顯示 -->
+      <div id="lam-cert-section" style="display:none;margin-bottom:14px;padding:14px;background:#f8f9fc;border-radius:10px;border:1.5px dashed var(--border)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <label class="form-label" style="margin:0;color:var(--red)">病單 / 證明文件 <span style="font-weight:400;font-size:11px">（此假別必填）</span></label>
+          <span id="lam-cert-badge" style="display:none;font-size:11px;font-weight:700;color:var(--green);background:#e8f9f0;padding:2px 8px;border-radius:10px">已上傳 ✓</span>
+        </div>
+        <input type="hidden" id="lam-doc-id">
+        <div id="lam-cert-preview" style="display:none;margin-bottom:8px">
+          <a id="lam-cert-link" href="#" target="_blank" style="font-size:12px;color:var(--accent)">查看已上傳病單</a>
+          <button type="button" class="btn btn-outline btn-sm" style="margin-left:8px;font-size:11px" onclick="lamClearCert()">重新上傳</button>
+        </div>
+        <div id="lam-upload-area">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="file" id="lam-cert-file" accept="image/*,application/pdf" capture="environment" style="display:none" onchange="lamUploadCert(this)">
+            <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('lam-cert-file').click()">拍照 / 選擇檔案</button>
+            <span style="font-size:11px;color:var(--muted)">支援 JPG、PNG、PDF（上限 10MB）</span>
+          </label>
+          <div id="lam-cert-uploading" style="display:none;font-size:12px;color:var(--muted);margin-top:6px">上傳中...</div>
+        </div>
+      </div>
       <div style="margin-bottom:12px"><label class="form-label">狀態</label><select class="form-input" id="lam-status" style="width:auto"><option value="approved">直接核准</option><option value="pending">待審核</option></select></div>
       <div><label class="form-label">原因/備註</label><input class="form-input" id="lam-reason" placeholder="選填" style="width:100%"></div>
     </div>
@@ -2520,10 +2540,15 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <div id="lrm-cert-section" style="display:none;margin-bottom:12px">
         <a id="lrm-cert-link" href="#" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none">查看病單</a>
       </div>
+      <!-- 病單缺失警告（有 require_cert 但無 document_id） -->
+      <div id="lrm-cert-warn" style="display:none;margin-bottom:12px;padding:10px 14px;background:#ffe8e8;border-radius:8px;border-left:3px solid var(--red)">
+        <div style="font-size:12px;font-weight:700;color:var(--red)">⚠ 此假別需要病單 / 證明文件</div>
+        <div style="font-size:11px;color:var(--red);margin-top:3px">員工尚未上傳病單，無法核准。請退回申請並要求員工補傳，或由管理員在「編輯」功能中代為上傳。</div>
+      </div>
       <div style="margin-bottom:12px"><label class="form-label">審核人員 *</label><input class="form-input" id="lrm-by" placeholder="管理員姓名" style="width:100%"></div>
       <div><label class="form-label">審核意見（選填）</label><input class="form-input" id="lrm-note" placeholder="退回原因或備註" style="width:100%"></div>
     </div>
-    <div class="modal-footer"><button class="btn btn-outline" onclick="closeLeaveReview()">取消</button><button class="btn btn-danger" onclick="reviewLeave('reject')">退回</button><button class="btn btn-primary" style="background:var(--green)" onclick="reviewLeave('approve')">核准</button></div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeLeaveReview()">取消</button><button class="btn btn-danger" onclick="reviewLeave('reject')">退回</button><button class="btn btn-primary" id="lrm-approve-btn" style="background:var(--green)" onclick="reviewLeave('approve')">核准</button></div>
   </div>
 </div>
 
@@ -2546,6 +2571,13 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         <div><label class="form-label">狀態</label><select class="form-input" id="ltm-active"><option value="1">啟用</option><option value="0">停用</option></select></div>
       </div>
       <div><label class="form-label">說明（選填）</label><input class="form-input" id="ltm-desc" style="width:100%"></div>
+      <div style="margin-top:12px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="ltm-require-cert" style="width:16px;height:16px;accent-color:var(--accent)">
+          <span class="form-label" style="margin:0">申請此假別需上傳病單 / 證明文件</span>
+        </label>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;margin-left:24px">勾選後，管理員審核核准前必須確認已上傳病單</div>
+      </div>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeLeaveTypeModal()">取消</button><button class="btn btn-primary" onclick="saveLeaveType()">儲存</button></div>
   </div>
@@ -5384,9 +5416,11 @@ async function openLeaveAdminModal(id=null) {
     document.getElementById('lam-hours').value = r.total_hours || '';
     document.getElementById('lam-reason').value = r.reason||'';
     document.getElementById('lam-status').value = r.status;
+    lamSetCert(r.document_id || null);
   } else {
     document.getElementById('lam-title').textContent = '管理員代填請假';
     document.getElementById('lam-id').value = '';
+    lamSetCert(null);
     const now = new Date();
     const today = now.toISOString().slice(0,10);
     document.getElementById('lam-start').value = today;
@@ -5395,10 +5429,43 @@ async function openLeaveAdminModal(id=null) {
   ['lam-start','lam-end','lam-start-half','lam-end-half','lam-staff','lam-type'].forEach(id2 =>
     document.getElementById(id2).addEventListener('change', previewLeaveDays)
   );
+  document.getElementById('lam-type').addEventListener('change', lamUpdateCertSection);
+  lamUpdateCertSection();
   previewLeaveDays();
   document.getElementById('leave-admin-modal').style.display='flex';
 }
 function closeLeaveAdminModal() { document.getElementById('leave-admin-modal').style.display='none'; }
+
+function lamUpdateCertSection() {
+  const typeId = parseInt(document.getElementById('lam-type').value);
+  const lt = leaveTypesList.find(x=>x.id===typeId);
+  document.getElementById('lam-cert-section').style.display = (lt && lt.require_cert) ? '' : 'none';
+}
+function lamSetCert(docId) {
+  document.getElementById('lam-doc-id').value = docId || '';
+  const hasCert = !!docId;
+  document.getElementById('lam-cert-badge').style.display  = hasCert ? '' : 'none';
+  document.getElementById('lam-cert-preview').style.display = hasCert ? '' : 'none';
+  document.getElementById('lam-upload-area').style.display  = hasCert ? 'none' : '';
+  if (hasCert) document.getElementById('lam-cert-link').href = `/api/documents/${docId}/image`;
+}
+function lamClearCert() {
+  document.getElementById('lam-cert-file').value = '';
+  lamSetCert(null);
+}
+async function lamUploadCert(input) {
+  const file = input.files[0]; if (!file) return;
+  document.getElementById('lam-cert-uploading').style.display = '';
+  const fd = new FormData(); fd.append('file', file);
+  try {
+    const r = await fetch('/api/leave/upload-cert', {method:'POST', body:fd});
+    const d = await r.json();
+    if (!r.ok) { showToast(d.error||'上傳失敗', 'error'); return; }
+    lamSetCert(d.document_id);
+    showToast('病單已上傳', 'success');
+  } catch(e) { showToast('上傳失敗', 'error'); }
+  finally { document.getElementById('lam-cert-uploading').style.display = 'none'; }
+}
 
 function previewLeaveDays() {
   const s = document.getElementById('lam-start').value;
@@ -5447,6 +5514,14 @@ async function saveLeaveAdmin() {
   const reason     = document.getElementById('lam-reason').value.trim();
   const status     = document.getElementById('lam-status').value;
   if (!staff_id||!leave_type_id||!start_date||!end_date) { showToast('請填寫完整資料','error'); return; }
+  const document_id = parseInt(document.getElementById('lam-doc-id').value) || null;
+  // 病單必填驗證：需要病單且狀態為直接核准
+  const lt = leaveTypesList.find(x=>x.id===parseInt(leave_type_id));
+  if (lt && lt.require_cert && !document_id) {
+    showToast('此假別需要上傳病單/證明文件', 'error');
+    document.getElementById('lam-cert-section').style.display = '';
+    return;
+  }
   if (id) {
     // Delete and recreate (simplest approach)
     await api(`/api/leave/requests/${id}`,{method:'DELETE'});
@@ -5454,7 +5529,7 @@ async function saveLeaveAdmin() {
   const hoursVal = parseFloat(document.getElementById('lam-hours').value);
   const total_hours = !isNaN(hoursVal) && hoursVal > 0 ? hoursVal : undefined;
   if (total_hours !== undefined && (total_hours < 0.5 || total_hours > 8)) { showToast('時數需介於 0.5～8 小時','error'); return; }
-  const {ok} = await api('/api/leave/requests', apiJSON({staff_id:parseInt(staff_id),leave_type_id:parseInt(leave_type_id),start_date,end_date,start_half,end_half,total_hours,reason,status,reviewed_by:'管理員'}));
+  const {ok} = await api('/api/leave/requests', apiJSON({staff_id:parseInt(staff_id),leave_type_id:parseInt(leave_type_id),start_date,end_date,start_half,end_half,total_hours,reason,status,reviewed_by:'管理員',document_id}));
   if (!ok) return;
   closeLeaveAdminModal(); showToast(id?'已更新':'請假記錄已建立','success'); await loadLeaveRequests();
 }
@@ -5485,11 +5560,24 @@ function openLeaveReview(id) {
     <span style="color:var(--muted)">${escHtml(r.reason||'（無說明）')}</span>${balHtml}`;
   const certSec  = document.getElementById('lrm-cert-section');
   const certLink = document.getElementById('lrm-cert-link');
+  const certWarn = document.getElementById('lrm-cert-warn');
+  const approveBtn = document.getElementById('lrm-approve-btn');
   if (r.document_id) {
     certLink.href = `/api/documents/${r.document_id}/image`;
     certSec.style.display = '';
+    certWarn.style.display = 'none';
+    approveBtn.disabled = false;
+    approveBtn.style.opacity = '';
+  } else if (r.require_cert) {
+    certSec.style.display = 'none';
+    certWarn.style.display = '';
+    approveBtn.disabled = true;
+    approveBtn.style.opacity = '0.4';
   } else {
     certSec.style.display = 'none';
+    certWarn.style.display = 'none';
+    approveBtn.disabled = false;
+    approveBtn.style.opacity = '';
   }
   document.getElementById('leave-review-modal').style.display='flex';
 }
@@ -5701,10 +5789,12 @@ function openLeaveTypeModal(id=null) {
     document.getElementById('ltm-color').value = t.color;
     document.getElementById('ltm-active').value= t.active?'1':'0';
     document.getElementById('ltm-desc').value  = t.description||'';
+    document.getElementById('ltm-require-cert').checked = !!t.require_cert;
   } else {
     ['ltm-name','ltm-code','ltm-desc'].forEach(i=>document.getElementById(i).value='');
     document.getElementById('ltm-pay').value='1'; document.getElementById('ltm-max').value='';
     document.getElementById('ltm-color').value='#4a7bda'; document.getElementById('ltm-active').value='1';
+    document.getElementById('ltm-require-cert').checked = false;
   }
   document.getElementById('leave-type-modal').style.display='flex';
 }
@@ -5719,6 +5809,7 @@ async function saveLeaveType() {
     color:document.getElementById('ltm-color').value,
     active:document.getElementById('ltm-active').value==='1',
     description:document.getElementById('ltm-desc').value.trim(),
+    require_cert:document.getElementById('ltm-require-cert').checked,
   };
   if (!body.name||!body.code) { showToast('請填寫假別名稱和代碼','error'); return; }
   const {ok} = await api(id?`/api/leave/types/${id}`:'/api/leave/types',{method:id?'PUT':'POST',body:JSON.stringify(body)});

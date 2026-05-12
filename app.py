@@ -3230,6 +3230,7 @@ def init_leave_db():
             UNIQUE(staff_id, leave_type_id, year)
         )""",
         "ALTER TABLE leave_types ADD COLUMN IF NOT EXISTS allow_hourly BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE leave_types ADD COLUMN IF NOT EXISTS require_cert BOOLEAN DEFAULT FALSE",
         "ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS total_hours NUMERIC(5,1)",
     ]
     for sql in migrations:
@@ -3274,6 +3275,7 @@ def leave_type_row(row):
     if d.get('max_days') is not None: d['max_days'] = float(d['max_days'])
     if d.get('pay_rate') is not None: d['pay_rate'] = float(d['pay_rate'])
     if d.get('created_at'): d['created_at'] = d['created_at'].isoformat()
+    d['require_cert'] = bool(d.get('require_cert', False))
     return d
 
 def leave_req_row(row):
@@ -3467,11 +3469,12 @@ def api_leave_type_create():
     b = request.get_json(force=True)
     with get_db() as conn:
         row = conn.execute("""
-            INSERT INTO leave_types (name,code,pay_rate,max_days,description,color,sort_order)
-            VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING *
+            INSERT INTO leave_types (name,code,pay_rate,max_days,description,color,sort_order,require_cert)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *
         """, (b['name'], b['code'], float(b.get('pay_rate',1.0)),
               b.get('max_days') or None, b.get('description',''),
-              b.get('color','#4a7bda'), int(b.get('sort_order',0)))).fetchone()
+              b.get('color','#4a7bda'), int(b.get('sort_order',0)),
+              bool(b.get('require_cert', False)))).fetchone()
     return jsonify(leave_type_row(row)), 201
 
 @app.route('/api/leave/types/<int:tid>', methods=['PUT'])
@@ -3481,12 +3484,12 @@ def api_leave_type_update(tid):
     with get_db() as conn:
         row = conn.execute("""
             UPDATE leave_types SET name=%s,code=%s,pay_rate=%s,max_days=%s,
-              description=%s,color=%s,sort_order=%s,active=%s
+              description=%s,color=%s,sort_order=%s,active=%s,require_cert=%s
             WHERE id=%s RETURNING *
         """, (b['name'], b['code'], float(b.get('pay_rate',1.0)),
               b.get('max_days') or None, b.get('description',''),
               b.get('color','#4a7bda'), int(b.get('sort_order',0)),
-              bool(b.get('active',True)), tid)).fetchone()
+              bool(b.get('active',True)), bool(b.get('require_cert',False)), tid)).fetchone()
     return jsonify(leave_type_row(row)) if row else ('', 404)
 
 @app.route('/api/leave/types/<int:tid>', methods=['DELETE'])
@@ -3512,7 +3515,7 @@ def api_leave_requests_list():
         rows = conn.execute(f"""
             SELECT lr.*, ps.name as staff_name, ps.role as staff_role,
                    lt.name as leave_type_name, lt.code as leave_code,
-                   lt.pay_rate, lt.color as leave_color
+                   lt.pay_rate, lt.color as leave_color, lt.require_cert
             FROM leave_requests lr
             JOIN punch_staff ps ON ps.id=lr.staff_id
             JOIN leave_types  lt ON lt.id=lr.leave_type_id
@@ -3528,6 +3531,7 @@ def api_leave_requests_list():
         d['leave_code']      = r['leave_code']
         d['pay_rate']        = float(r['pay_rate'])
         d['leave_color']     = r['leave_color']
+        d['require_cert']    = bool(r['require_cert'])
         result.append(d)
     return jsonify(result)
 
@@ -3544,6 +3548,7 @@ def api_leave_request_admin_create():
     end_half      = bool(b.get('end_half', False))
     reason        = b.get('reason', '').strip()
     status        = b.get('status', 'approved')
+    document_id   = b.get('document_id') or None
 
     if not all([sid, leave_type_id, start_date, end_date]):
         return jsonify({'error': '缺少必要欄位'}), 400
@@ -3569,16 +3574,20 @@ def api_leave_request_admin_create():
             return jsonify({'error': '請假天數不合理，請檢查日期'}), 400
 
     with get_db() as conn:
+        # 若假別需要病單且狀態為核准，必須附上病單
+        lt_row = conn.execute("SELECT require_cert FROM leave_types WHERE id=%s", (leave_type_id,)).fetchone()
+        if lt_row and lt_row['require_cert'] and status == 'approved' and not document_id:
+            return jsonify({'error': '此假別需要上傳病單/證明才能直接核准'}), 422
         row = conn.execute("""
             INSERT INTO leave_requests
               (staff_id, leave_type_id, start_date, end_date, start_half, end_half,
-               total_days, total_hours, reason, status, reviewed_by, reviewed_at)
+               total_days, total_hours, reason, status, reviewed_by, reviewed_at, document_id)
             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-              CASE WHEN %s='approved' THEN NOW() ELSE NULL END)
+              CASE WHEN %s='approved' THEN NOW() ELSE NULL END, %s)
             RETURNING *
         """, (sid, leave_type_id, start_date, end_date, start_half, end_half,
               total_days, total_hours_req, reason, status,
-              b.get('reviewed_by','管理員'), status)).fetchone()
+              b.get('reviewed_by','管理員'), status, document_id)).fetchone()
         if status == 'approved':
             _update_leave_balance(conn, sid, leave_type_id, start_date[:4], total_days)
     return jsonify(leave_req_row(row)), 201
@@ -3597,6 +3606,11 @@ def api_leave_request_review(rid):
         old = conn.execute("SELECT * FROM leave_requests WHERE id=%s", (rid,)).fetchone()
         if not old: return ('', 404)
         old_status = old['status']
+        # 強制病單：假別設定 require_cert 且要核准時，沒有 document_id 則擋住
+        if action == 'approve':
+            lt_chk = conn.execute("SELECT require_cert FROM leave_types WHERE id=%s", (old['leave_type_id'],)).fetchone()
+            if lt_chk and lt_chk['require_cert'] and not old.get('document_id'):
+                return jsonify({'error': '此假別需要上傳病單/證明才能核准'}), 422
         row = conn.execute("""
             UPDATE leave_requests
             SET status=%s, reviewed_by=%s, review_note=%s,
@@ -9983,8 +9997,8 @@ def api_expense_ocr():
 
 @app.route('/api/leave/upload-cert', methods=['POST'])
 def api_leave_upload_cert():
-    sid = session.get('punch_staff_id')
-    if not sid: return jsonify({'error': '請先登入'}), 401
+    if not (session.get('punch_staff_id') or session.get('logged_in')):
+        return jsonify({'error': '請先登入'}), 401
     file = request.files.get('file')
     if not file: return jsonify({'error': '請上傳圖片'}), 400
     raw = file.read()
