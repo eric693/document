@@ -5410,6 +5410,8 @@ async function openLeaveAdminModal(id=null) {
     document.getElementById('lam-reason').value = r.reason||'';
     document.getElementById('lam-status').value = r.status;
     lamSetCert(r.document_id || null);
+    // 直接用 leave request 上的 require_cert（來自 JOIN，最可靠）
+    document.getElementById('lam-cert-section').style.display = r.require_cert ? '' : 'none';
   } else {
     document.getElementById('lam-title').textContent = '管理員代填請假';
     document.getElementById('lam-id').value = '';
@@ -5423,7 +5425,7 @@ async function openLeaveAdminModal(id=null) {
     document.getElementById(id2).addEventListener('change', previewLeaveDays)
   );
   document.getElementById('lam-type').addEventListener('change', lamUpdateCertSection);
-  lamUpdateCertSection();
+  if (!id) lamUpdateCertSection(); // 新增時才需初始化；編輯時已在 if(id) 中直接設定
   previewLeaveDays();
   document.getElementById('leave-admin-modal').style.display='flex';
 }
