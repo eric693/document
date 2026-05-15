@@ -43,13 +43,20 @@ def init_db():
             birth_date     DATE,
             base_salary    NUMERIC(12,2) DEFAULT 0,
             insured_salary NUMERIC(12,2) DEFAULT 0,
+            hourly_rate    NUMERIC(12,2) DEFAULT 0,
             daily_hours    NUMERIC(5,2) DEFAULT 8,
             salary_type    TEXT DEFAULT 'monthly',
+            ot_rate1       NUMERIC(5,2) DEFAULT 1.33,
+            ot_rate2       NUMERIC(5,2) DEFAULT 1.67,
+            ot_rate3       NUMERIC(5,2) DEFAULT 2.00,
+            vacation_quota INT,
             line_user_id   TEXT,
             active         BOOLEAN DEFAULT TRUE,
             sort_order     INT DEFAULT 0,
             store_id       INT,
             finance_synced BOOLEAN DEFAULT FALSE,
+            terminated_at  DATE,
+            termination_reason TEXT DEFAULT '',
             created_at     TIMESTAMPTZ DEFAULT NOW()
         )""",
         """CREATE TABLE IF NOT EXISTS punch_records (
@@ -85,23 +92,26 @@ def init_db():
             updated_at           TIMESTAMPTZ DEFAULT NOW()
         )""",
         """CREATE TABLE IF NOT EXISTS schedule_config (
-            id           SERIAL PRIMARY KEY,
-            month        TEXT NOT NULL,
-            off_days_per_week INT DEFAULT 2,
-            note         TEXT DEFAULT '',
-            updated_at   TIMESTAMPTZ DEFAULT NOW(),
+            id              SERIAL PRIMARY KEY,
+            month           TEXT NOT NULL,
+            max_off_per_day INT DEFAULT 2,
+            vacation_quota  INT DEFAULT 8,
+            notes           TEXT DEFAULT '',
+            updated_at      TIMESTAMPTZ DEFAULT NOW(),
             UNIQUE(month)
         )""",
         """CREATE TABLE IF NOT EXISTS schedule_requests (
             id           SERIAL PRIMARY KEY,
             staff_id     INT REFERENCES punch_staff(id) ON DELETE CASCADE,
             month        TEXT NOT NULL,
-            preferred_off JSONB DEFAULT '[]',
-            note         TEXT DEFAULT '',
+            dates        JSONB DEFAULT '[]',
+            submit_note  TEXT DEFAULT '',
             status       TEXT DEFAULT 'pending',
             reviewed_by  TEXT DEFAULT '',
             reviewed_at  TIMESTAMPTZ,
-            created_at   TIMESTAMPTZ DEFAULT NOW()
+            updated_at   TIMESTAMPTZ DEFAULT NOW(),
+            created_at   TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE(staff_id, month)
         )""",
         """CREATE TABLE IF NOT EXISTS punch_requests (
             id           SERIAL PRIMARY KEY,
@@ -142,6 +152,7 @@ def init_db():
             reason       TEXT DEFAULT '',
             status       TEXT DEFAULT 'pending',
             pay_type     TEXT DEFAULT 'normal',
+            day_type     TEXT DEFAULT 'weekday',
             ot_pay       NUMERIC(12,2) DEFAULT 0,
             reviewed_by  TEXT DEFAULT '',
             reviewed_at  TIMESTAMPTZ,
@@ -158,6 +169,7 @@ def init_db():
             id             SERIAL PRIMARY KEY,
             username       TEXT NOT NULL UNIQUE,
             password_hash  TEXT NOT NULL,
+            password_plain TEXT DEFAULT '',
             display_name   TEXT DEFAULT '',
             is_super       BOOLEAN DEFAULT FALSE,
             permissions    JSONB DEFAULT '[]',
@@ -192,8 +204,13 @@ def init_db():
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS birth_date DATE",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS base_salary NUMERIC(12,2) DEFAULT 0",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS insured_salary NUMERIC(12,2) DEFAULT 0",
+        "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS hourly_rate NUMERIC(12,2) DEFAULT 0",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS daily_hours NUMERIC(5,2) DEFAULT 8",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS salary_type TEXT DEFAULT 'monthly'",
+        "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS ot_rate1 NUMERIC(5,2) DEFAULT 1.33",
+        "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS ot_rate2 NUMERIC(5,2) DEFAULT 1.67",
+        "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS ot_rate3 NUMERIC(5,2) DEFAULT 2.00",
+        "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS vacation_quota INT",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS line_user_id TEXT",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS sort_order INT DEFAULT 0",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS store_id INT",
@@ -210,12 +227,35 @@ def init_db():
         "ALTER TABLE overtime_requests ADD COLUMN IF NOT EXISTS start_time TEXT DEFAULT ''",
         "ALTER TABLE overtime_requests ADD COLUMN IF NOT EXISTS end_time TEXT DEFAULT ''",
         "ALTER TABLE overtime_requests ADD COLUMN IF NOT EXISTS pay_type TEXT DEFAULT 'normal'",
+        "ALTER TABLE overtime_requests ADD COLUMN IF NOT EXISTS day_type TEXT DEFAULT 'weekday'",
         "ALTER TABLE overtime_requests ADD COLUMN IF NOT EXISTS ot_pay NUMERIC(12,2) DEFAULT 0",
-        # schedule_requests
+        # schedule_config — rename old columns, add new
+        "ALTER TABLE schedule_config ADD COLUMN IF NOT EXISTS max_off_per_day INT DEFAULT 2",
+        "ALTER TABLE schedule_config ADD COLUMN IF NOT EXISTS vacation_quota INT DEFAULT 8",
+        "ALTER TABLE schedule_config ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT ''",
+        "UPDATE schedule_config SET max_off_per_day=off_days_per_week WHERE max_off_per_day=2",
+        "UPDATE schedule_config SET notes=note WHERE notes=''",
+        # schedule_requests — rename old columns, add new, add UNIQUE constraint
+        "ALTER TABLE schedule_requests ADD COLUMN IF NOT EXISTS dates JSONB DEFAULT '[]'",
+        "ALTER TABLE schedule_requests ADD COLUMN IF NOT EXISTS submit_note TEXT DEFAULT ''",
+        "ALTER TABLE schedule_requests ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW()",
+        "UPDATE schedule_requests SET dates=preferred_off WHERE preferred_off IS NOT NULL AND preferred_off!='[]'::jsonb",
+        "UPDATE schedule_requests SET submit_note=note WHERE note!=''",
+        """DO $$ BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname='schedule_requests_staff_id_month_key'
+              AND conrelid='schedule_requests'::regclass
+          ) THEN
+            ALTER TABLE schedule_requests ADD CONSTRAINT schedule_requests_staff_id_month_key UNIQUE (staff_id, month);
+          END IF;
+        END $$""",
+        # schedule_requests status/reviewed columns
         "ALTER TABLE schedule_requests ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'pending'",
         "ALTER TABLE schedule_requests ADD COLUMN IF NOT EXISTS reviewed_by TEXT DEFAULT ''",
         "ALTER TABLE schedule_requests ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ",
         # admin_accounts
+        "ALTER TABLE admin_accounts ADD COLUMN IF NOT EXISTS password_plain TEXT DEFAULT ''",
         "ALTER TABLE admin_accounts ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ",
         # leave_requests
         "ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS leave_start_time TEXT",

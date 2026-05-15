@@ -238,7 +238,8 @@ def api_dashboard():
                    COALESCE(SUM(deduction_total),0) as total_deduct
             FROM salary_records WHERE month=%s
         """, (month,)).fetchone()
-        days_in_month = _cal.monthrange(today.year, today.month)[1]
+        m_year, m_month = int(month[:4]), int(month[5:])
+        days_in_month = _cal.monthrange(m_year, m_month)[1]
         daily_rows = conn.execute("""
             SELECT (punched_at AT TIME ZONE 'Asia/Taipei')::date as d,
                    COUNT(DISTINCT staff_id) as cnt
@@ -250,8 +251,8 @@ def api_dashboard():
         daily_attendance = [
             {'date': f"{month}-{d:02d}", 'day': d,
              'count': daily_map.get(f"{month}-{d:02d}", 0),
-             'is_past': _date(today.year, today.month, d) <= today,
-             'weekday': _date(today.year, today.month, d).weekday()}
+             'is_past': _date(m_year, m_month, d) <= today,
+             'weekday': _date(m_year, m_month, d).weekday()}
             for d in range(1, days_in_month + 1)
         ]
         leave_dist_rows = conn.execute("""
