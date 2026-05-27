@@ -5,7 +5,11 @@ app.py — Flask 應用入口（精簡版）
 import os
 import secrets
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from flask import Flask
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import DATABASE_URL
 from db import init_db
@@ -13,6 +17,7 @@ from db import init_db
 # ── Flask App ──────────────────────────────────────────────────────
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 print(f"[startup] DATABASE_URL prefix: {DATABASE_URL[:20] if DATABASE_URL else 'NOT SET'}")
 

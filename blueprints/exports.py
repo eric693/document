@@ -1,5 +1,5 @@
 """
-blueprints/exports.py — Excel/EDI 匯出報表（出勤、薪資、請假、加班、員工、訓練、績效、費用、扣繳）
+blueprints/exports.py — Excel/EDI/PDF 匯出報表（出勤、薪資、請假、加班、員工、訓練、績效、費用、扣繳）
 """
 import io
 from datetime import datetime as _dt, date as _date
@@ -10,6 +10,72 @@ from config import TW_TZ
 from db import get_db
 
 bp = Blueprint('exports', __name__)
+
+# ── PDF 輔助函式 ───────────────────────────────────────────────────
+
+def _register_zh_font():
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+    try:
+        pdfmetrics.getFont('STSong-Light')
+    except Exception:
+        pdfmetrics.registerFont(UnicodeCIDFont('STSong-Light'))
+
+
+def _pdf_response(buf, filename):
+    buf.seek(0)
+    return Response(buf.read(), mimetype='application/pdf',
+                    headers={'Content-Disposition': f'attachment; filename={filename}'})
+
+
+def _build_pdf(title, subtitle, headers, col_widths, rows, landscape=False):
+    """產生帶標題與表格的 PDF，回傳 BytesIO。"""
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.pagesizes import A4, landscape as LS
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.lib.units import cm
+
+    _register_zh_font()
+    FONT = 'STSong-Light'
+    buf = io.BytesIO()
+    pagesize = LS(A4) if landscape else A4
+    doc = SimpleDocTemplate(buf, pagesize=pagesize,
+                            leftMargin=1.5*cm, rightMargin=1.5*cm,
+                            topMargin=1.5*cm, bottomMargin=1.5*cm)
+
+    title_style = ParagraphStyle('title', fontName=FONT, fontSize=14, spaceAfter=4)
+    sub_style   = ParagraphStyle('sub',   fontName=FONT, fontSize=9,  textColor=colors.grey, spaceAfter=8)
+
+    total_w = sum(col_widths)
+    page_w  = (pagesize[0] - 3*cm)
+    scale   = page_w / total_w if total_w > page_w else 1.0
+    scaled  = [w * scale for w in col_widths]
+
+    table_data = [headers] + [[str(v) if v is not None else '' for v in r] for r in rows]
+    t = Table(table_data, colWidths=scaled, repeatRows=1)
+    HDR_BG = colors.HexColor('#0F1C3A')
+    ROW_BG = colors.HexColor('#F4F6FA')
+    t.setStyle(TableStyle([
+        ('FONT',        (0, 0), (-1, -1), FONT, 8),
+        ('FONT',        (0, 0), (-1,  0), FONT, 9),
+        ('BACKGROUND',  (0, 0), (-1,  0), HDR_BG),
+        ('TEXTCOLOR',   (0, 0), (-1,  0), colors.white),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, ROW_BG]),
+        ('GRID',        (0, 0), (-1, -1), 0.4, colors.HexColor('#CCCCCC')),
+        ('ALIGN',       (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN',      (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING',  (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING',(0, 0), (-1, -1), 3),
+        ('WORDWRAP',    (0, 0), (-1, -1), True),
+    ]))
+
+    story = [Paragraph(title, title_style)]
+    if subtitle:
+        story.append(Paragraph(subtitle, sub_style))
+    story.append(t)
+    doc.build(story)
+    return buf
 
 # ── Excel 輔助函式（含完整格式） ───────────────────────────────────
 
@@ -659,6 +725,411 @@ tr:nth-child(even){{background:#f8f9fb}}
 <th>年度薪資合計(元)</th><th>二代健保補充費(元)</th><th>扣繳稅額(元)</th></tr></thead>
 <tbody>{rows_html}</tbody></table></body></html>"""
     return html, 200, {'Content-Type': 'text/html; charset=utf-8'}
+
+
+# ── PDF Exports ────────────────────────────────────────────────────
+
+@bp.route('/api/export/attendance/pdf', methods=['GET'])
+@login_required
+def api_export_attendance_pdf():
+    month    = request.args.get('month', '') or _dt.now(TW_TZ).strftime('%Y-%m')
+    staff_id = request.args.get('staff_id', '')
+    conds, params = ["TO_CHAR(pr.punched_at AT TIME ZONE 'Asia/Taipei','YYYY-MM')=%s"], [month]
+    if staff_id:
+        conds.append("pr.staff_id=%s"); params.append(int(staff_id))
+    with get_db() as conn:
+        rows = conn.execute(f"""
+            SELECT ps.employee_code, ps.name as staff_name, ps.department,
+                   (pr.punched_at AT TIME ZONE 'Asia/Taipei')::date as work_date,
+                   pr.punch_type,
+                   to_char(pr.punched_at AT TIME ZONE 'Asia/Taipei', 'HH24:MI') as punch_time,
+                   pr.is_manual, pr.location_name
+            FROM punch_records pr JOIN punch_staff ps ON ps.id = pr.staff_id
+            WHERE {' AND '.join(conds)} ORDER BY ps.name, pr.punched_at
+        """, params).fetchall()
+    PUNCH_LABEL = {'in': '上班', 'out': '下班', 'break_out': '休息開始', 'break_in': '休息結束'}
+    headers   = ['員工代碼', '姓名', '部門', '日期', '打卡類型', '時間', '補打', '地點']
+    col_widths = [55, 55, 60, 65, 60, 45, 30, 70]
+    data = [[r['employee_code'] or '', r['staff_name'], r['department'] or '',
+             str(r['work_date']), PUNCH_LABEL.get(r['punch_type'], r['punch_type']),
+             r['punch_time'], '是' if r['is_manual'] else '', r['location_name'] or '']
+            for r in rows]
+    buf = _build_pdf(f'{month} 出勤打卡明細', f'製表：{_date.today().isoformat()}  共 {len(data)} 筆',
+                     headers, col_widths, data, landscape=True)
+    return _pdf_response(buf, f'attendance_{month}.pdf')
+
+
+@bp.route('/api/export/attendance-summary/pdf', methods=['GET'])
+@login_required
+def api_export_attendance_summary_pdf():
+    month = request.args.get('month', '') or _dt.now(TW_TZ).strftime('%Y-%m')
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT ps.employee_code, ps.name, ps.department,
+                   (pr.punched_at AT TIME ZONE 'Asia/Taipei')::date as work_date,
+                   MIN(CASE WHEN pr.punch_type='in'  THEN to_char(pr.punched_at AT TIME ZONE 'Asia/Taipei','HH24:MI') END) as clock_in,
+                   MAX(CASE WHEN pr.punch_type='out' THEN to_char(pr.punched_at AT TIME ZONE 'Asia/Taipei','HH24:MI') END) as clock_out,
+                   MIN(CASE WHEN pr.punch_type='in'  THEN pr.punched_at AT TIME ZONE 'Asia/Taipei' END) as ci_ts,
+                   MAX(CASE WHEN pr.punch_type='out' THEN pr.punched_at AT TIME ZONE 'Asia/Taipei' END) as co_ts,
+                   BOOL_OR(pr.is_manual) as has_manual, COUNT(*) as punch_count
+            FROM punch_records pr JOIN punch_staff ps ON ps.id = pr.staff_id
+            WHERE TO_CHAR(pr.punched_at AT TIME ZONE 'Asia/Taipei','YYYY-MM')=%s
+            GROUP BY ps.employee_code, ps.name, ps.department,
+                     (pr.punched_at AT TIME ZONE 'Asia/Taipei')::date
+            ORDER BY ps.name, (pr.punched_at AT TIME ZONE 'Asia/Taipei')::date
+        """, (month,)).fetchall()
+    headers    = ['員工代碼', '姓名', '部門', '日期', '上班', '下班', '工時(h)', '打卡次數', '含補打']
+    col_widths = [55, 55, 60, 65, 45, 45, 50, 55, 40]
+    data = []
+    for r in rows:
+        dur_h = ''
+        if r['ci_ts'] and r['co_ts']:
+            try:
+                ci = r['ci_ts'] if hasattr(r['ci_ts'], 'timestamp') else _dt.fromisoformat(str(r['ci_ts']))
+                co = r['co_ts'] if hasattr(r['co_ts'], 'timestamp') else _dt.fromisoformat(str(r['co_ts']))
+                dur_h = str(round((co - ci).total_seconds() / 3600, 2))
+            except Exception:
+                pass
+        data.append([r['employee_code'] or '', r['name'], r['department'] or '',
+                     str(r['work_date']), r['clock_in'] or '', r['clock_out'] or '',
+                     dur_h, str(r['punch_count']), '是' if r['has_manual'] else ''])
+    buf = _build_pdf(f'{month} 出勤摘要', f'製表：{_date.today().isoformat()}  共 {len(data)} 筆',
+                     headers, col_widths, data, landscape=True)
+    return _pdf_response(buf, f'attendance_summary_{month}.pdf')
+
+
+@bp.route('/api/attendance/anomaly-report/pdf', methods=['GET'])
+@login_required
+def api_anomaly_report_pdf():
+    import calendar as _cal
+    month = request.args.get('month', '') or _dt.now(TW_TZ).strftime('%Y-%m')
+    try:
+        y, mo = int(month[:4]), int(month[5:7])
+    except Exception:
+        return jsonify({'error': '月份格式錯誤'}), 400
+    with get_db() as conn:
+        punch_rows = conn.execute("""
+            SELECT ps.id as staff_id, ps.name as staff_name, ps.department,
+                   (pr.punched_at AT TIME ZONE 'Asia/Taipei')::date as work_date,
+                   MIN(CASE WHEN pr.punch_type='in'  THEN (pr.punched_at AT TIME ZONE 'Asia/Taipei') END) as clock_in,
+                   MAX(CASE WHEN pr.punch_type='out' THEN (pr.punched_at AT TIME ZONE 'Asia/Taipei') END) as clock_out,
+                   BOOL_OR(pr.punch_type='in')  as has_in,
+                   BOOL_OR(pr.punch_type='out') as has_out
+            FROM punch_records pr JOIN punch_staff ps ON ps.id=pr.staff_id AND ps.active=TRUE
+            WHERE TO_CHAR(pr.punched_at AT TIME ZONE 'Asia/Taipei','YYYY-MM')=%s
+            GROUP BY ps.id, ps.name, ps.department, (pr.punched_at AT TIME ZONE 'Asia/Taipei')::date
+            ORDER BY work_date, ps.name
+        """, (month,)).fetchall()
+        shift_rows = conn.execute("""
+            SELECT sa.staff_id, sa.shift_date, st.start_time::text, st.end_time::text,
+                   ps.name as staff_name, ps.department
+            FROM shift_assignments sa JOIN shift_types st ON st.id=sa.shift_type_id
+            JOIN punch_staff ps ON ps.id=sa.staff_id AND ps.active=TRUE
+            WHERE TO_CHAR(sa.shift_date,'YYYY-MM')=%s
+        """, (month,)).fetchall()
+        first_day = f"{y}-{mo:02d}-01"
+        last_day  = f"{y}-{mo:02d}-{_cal.monthrange(y, mo)[1]:02d}"
+        leave_rows = conn.execute("""
+            SELECT staff_id, start_date, end_date FROM leave_requests
+            WHERE status='approved' AND start_date <= %s AND end_date >= %s
+        """, (last_day, first_day)).fetchall()
+    from datetime import timedelta as _td
+    shift_map = {(r['staff_id'], str(r['shift_date'])): r for r in shift_rows}
+    leave_set = set()
+    for lr in leave_rows:
+        cur = _date.fromisoformat(str(lr['start_date']))
+        e   = _date.fromisoformat(str(lr['end_date']))
+        while cur <= e:
+            leave_set.add((lr['staff_id'], str(cur))); cur += _td(days=1)
+    today = _date.today()
+    anomalies = []
+    for r in punch_rows:
+        ds = str(r['work_date']); sid = r['staff_id']
+        shift = shift_map.get((sid, ds))
+        anomaly_type = ''; detail = ''
+        if not r['has_in'] and r['has_out']:
+            anomaly_type = '缺上班打卡'; detail = f"僅有下班 {str(r['clock_out'])[11:16]}"
+        elif r['has_in'] and not r['has_out']:
+            if _date.fromisoformat(ds) < today:
+                anomaly_type = '缺下班打卡'; detail = f"上班 {str(r['clock_in'])[11:16]} 無下班"
+        elif r['has_in'] and r['has_out'] and shift:
+            ci_t = str(r['clock_in'])[11:16]; sh_s = str(shift['start_time'])[:5]
+            try:
+                late_mins = (int(ci_t[:2])*60+int(ci_t[3:5])) - (int(sh_s[:2])*60+int(sh_s[3:5]))
+                if late_mins > 10:
+                    anomaly_type = '遲到'; detail = f"應{sh_s}，實{ci_t}(+{late_mins}分)"
+            except Exception: pass
+            if not anomaly_type:
+                co_t = str(r['clock_out'])[11:16]; sh_e = str(shift['end_time'])[:5]
+                try:
+                    early_mins = (int(sh_e[:2])*60+int(sh_e[3:5])) - (int(co_t[:2])*60+int(co_t[3:5]))
+                    if early_mins > 15:
+                        anomaly_type = '早退'; detail = f"應{sh_e}，實{co_t}(-{early_mins}分)"
+                except Exception: pass
+        if anomaly_type:
+            anomalies.append([r['staff_name'], r['department'] or '', ds,
+                               str(shift['start_time'])[:5] if shift else '—',
+                               str(shift['end_time'])[:5]   if shift else '—',
+                               str(r['clock_in'])[11:16]  if r['clock_in']  else '—',
+                               str(r['clock_out'])[11:16] if r['clock_out'] else '—',
+                               anomaly_type, detail])
+    punched_set = {(r['staff_id'], str(r['work_date'])) for r in punch_rows}
+    for sr in shift_rows:
+        ds = str(sr['shift_date']); sid = sr['staff_id']
+        if _date.fromisoformat(ds) >= today: continue
+        if (sid, ds) in punched_set or (sid, ds) in leave_set: continue
+        anomalies.append([sr['staff_name'], sr['department'] or '', ds,
+                          str(sr['start_time'])[:5], str(sr['end_time'])[:5],
+                          '—', '—', '未打卡', f"排班{str(sr['start_time'])[:5]}~{str(sr['end_time'])[:5]}"])
+    anomalies.sort(key=lambda x: (x[2], x[0]))
+    headers    = ['姓名', '部門', '日期', '應上班', '應下班', '實際上班', '實際下班', '異常類型', '說明']
+    col_widths = [55, 55, 65, 45, 45, 50, 50, 55, 120]
+    buf = _build_pdf(f'{month} 出勤異常報告', f'製表：{_date.today().isoformat()}  共 {len(anomalies)} 筆',
+                     headers, col_widths, anomalies, landscape=True)
+    return _pdf_response(buf, f'anomaly_{month}.pdf')
+
+
+@bp.route('/api/export/salary/pdf', methods=['GET'])
+@login_required
+def api_export_salary_pdf():
+    month = request.args.get('month', '') or _dt.now(TW_TZ).strftime('%Y-%m')
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT sr.*, ps.name as staff_name, ps.employee_code, ps.department, ps.role, ps.salary_type
+            FROM salary_records sr JOIN punch_staff ps ON ps.id = sr.staff_id
+            WHERE sr.month = %s ORDER BY ps.name
+        """, (month,)).fetchall()
+    headers    = ['代碼', '姓名', '部門', '薪資制', '工作日', '出勤', '請假', '無薪假', '津貼', '扣除', '加班費', '實領', '狀態']
+    col_widths = [45, 55, 60, 45, 40, 40, 40, 45, 55, 55, 55, 65, 40]
+    data = [[r['employee_code'] or '', r['staff_name'], r['department'] or '',
+             '時薪' if r['salary_type'] == 'hourly' else '月薪',
+             str(r['work_days'] or 0), str(r['actual_days'] or 0),
+             str(r['leave_days'] or 0), str(r['unpaid_days'] or 0),
+             f"{float(r['allowance_total'] or 0):,.0f}",
+             f"{float(r['deduction_total'] or 0):,.0f}",
+             f"{float(r['ot_pay'] or 0):,.0f}",
+             f"{float(r['net_pay'] or 0):,.0f}",
+             '已確認' if r['status'] == 'confirmed' else '草稿']
+            for r in rows]
+    buf = _build_pdf(f'{month} 薪資明細', f'製表：{_date.today().isoformat()}  共 {len(data)} 人',
+                     headers, col_widths, data, landscape=True)
+    return _pdf_response(buf, f'salary_{month}.pdf')
+
+
+@bp.route('/api/export/leave/pdf', methods=['GET'])
+@login_required
+def api_export_leave_pdf():
+    month = request.args.get('month', ''); year = request.args.get('year', '')
+    staff_id = request.args.get('staff_id', ''); status = request.args.get('status', '')
+    conds, params = ['TRUE'], []
+    if status:   conds.append("lr.status=%s");                            params.append(status)
+    if month:    conds.append("to_char(lr.start_date,'YYYY-MM')=%s");     params.append(month)
+    if year:     conds.append("EXTRACT(YEAR FROM lr.start_date)=%s");      params.append(int(year))
+    if staff_id: conds.append("lr.staff_id=%s");                          params.append(int(staff_id))
+    with get_db() as conn:
+        rows = conn.execute(f"""
+            SELECT lr.*, ps.name as staff_name, ps.employee_code, ps.department,
+                   lt.name as leave_type_name, lt.pay_rate
+            FROM leave_requests lr JOIN punch_staff ps ON ps.id = lr.staff_id
+            JOIN leave_types lt ON lt.id = lr.leave_type_id
+            WHERE {' AND '.join(conds)} ORDER BY lr.start_date, ps.name
+        """, params).fetchall()
+    PAY_LABEL    = {1.0: '全薪', 0.5: '半薪', 0.0: '無薪'}
+    STATUS_LABEL = {'approved': '已核准', 'rejected': '已退回', 'pending': '待審核'}
+    headers    = ['員工代碼', '姓名', '部門', '假別', '薪資倍率', '開始日期', '結束日期', '天數', '原因', '代理人', '狀態']
+    col_widths = [50, 55, 60, 55, 50, 65, 65, 35, 100, 55, 45]
+    data = [[r['employee_code'] or '', r['staff_name'], r['department'] or '',
+             r['leave_type_name'], PAY_LABEL.get(float(r['pay_rate']), f"{r['pay_rate']}倍"),
+             str(r['start_date']), str(r['end_date']), str(float(r['total_days'])),
+             r['reason'] or '', r['substitute_name'] or '',
+             STATUS_LABEL.get(r['status'], r['status'])]
+            for r in rows]
+    label = month or year or 'all'
+    buf = _build_pdf(f'{label} 請假記錄', f'製表：{_date.today().isoformat()}  共 {len(data)} 筆',
+                     headers, col_widths, data, landscape=True)
+    return _pdf_response(buf, f'leave_{label}.pdf')
+
+
+@bp.route('/api/export/leave-balance/pdf', methods=['GET'])
+@login_required
+def api_export_leave_balance_pdf():
+    year = request.args.get('year', '') or str(_dt.now(TW_TZ).year)
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT lb.*, ps.name as staff_name, ps.employee_code, ps.department,
+                   lt.name as leave_type_name, lt.code as leave_code, lt.max_days
+            FROM leave_balances lb JOIN punch_staff ps ON ps.id = lb.staff_id
+            JOIN leave_types lt ON lt.id = lb.leave_type_id
+            WHERE lb.year = %s ORDER BY ps.department, ps.name, lt.sort_order
+        """, (int(year),)).fetchall()
+    headers    = ['員工代碼', '姓名', '部門', '假別', '假別代碼', '年度上限(天)', '已核准(天)', '剩餘(天)']
+    col_widths = [55, 55, 65, 65, 50, 65, 65, 55]
+    data = [[r['employee_code'] or '', r['staff_name'], r['department'] or '',
+             r['leave_type_name'], r['leave_code'] or '',
+             str(r['max_days']) if r['max_days'] is not None else '無限制',
+             str(float(r['used_days'] or 0)),
+             str(round(float(r['max_days'] or 0) - float(r['used_days'] or 0), 2))
+             if r['max_days'] is not None else '']
+            for r in rows]
+    buf = _build_pdf(f'{year} 年假別餘額', f'製表：{_date.today().isoformat()}  共 {len(data)} 筆',
+                     headers, col_widths, data)
+    return _pdf_response(buf, f'leave_balance_{year}.pdf')
+
+
+@bp.route('/api/export/overtime/pdf', methods=['GET'])
+@login_required
+def api_export_overtime_pdf():
+    month = request.args.get('month', ''); staff_id = request.args.get('staff_id', '')
+    status = request.args.get('status', '')
+    conds, params = ['TRUE'], []
+    if month:    conds.append("to_char(r.request_date,'YYYY-MM')=%s"); params.append(month)
+    if staff_id: conds.append("r.staff_id=%s");                        params.append(int(staff_id))
+    if status:   conds.append("r.status=%s");                          params.append(status)
+    with get_db() as conn:
+        rows = conn.execute(f"""
+            SELECT r.*, ps.name as staff_name, ps.employee_code, ps.department, ps.role
+            FROM overtime_requests r JOIN punch_staff ps ON ps.id = r.staff_id
+            WHERE {' AND '.join(conds)} ORDER BY r.request_date DESC, ps.name
+        """, params).fetchall()
+    STATUS_LABEL = {'approved': '已核准', 'rejected': '已退回', 'pending': '待審核'}
+    headers    = ['員工代碼', '姓名', '部門', '加班日期', '開始', '結束', '時數', '原因', '加班費', '狀態']
+    col_widths = [50, 55, 60, 65, 42, 42, 38, 90, 55, 45]
+    data = [[r['employee_code'] or '', r['staff_name'], r['department'] or '',
+             str(r['request_date']), str(r['start_time'] or '')[:5], str(r['end_time'] or '')[:5],
+             str(float(r['ot_hours'] or 0)), r['reason'] or '',
+             f"{float(r['ot_pay'] or 0):,.0f}" if r.get('ot_pay') else '',
+             STATUS_LABEL.get(r['status'], r['status'])]
+            for r in rows]
+    label = month or 'all'
+    buf = _build_pdf(f'{label} 加班記錄', f'製表：{_date.today().isoformat()}  共 {len(data)} 筆',
+                     headers, col_widths, data, landscape=True)
+    return _pdf_response(buf, f'overtime_{label}.pdf')
+
+
+@bp.route('/api/export/staff/pdf', methods=['GET'])
+@login_required
+def api_export_staff_pdf():
+    dept = request.args.get('department', ''); active = request.args.get('active', '1')
+    conds, params = ['TRUE'], []
+    if active == '1': conds.append("active=TRUE")
+    elif active == '0': conds.append("active=FALSE")
+    if dept: conds.append("department=%s"); params.append(dept)
+    with get_db() as conn:
+        rows = conn.execute(f"""
+            SELECT employee_code, name, department, role, position_title,
+                   salary_type, base_salary, insured_salary, hire_date, active
+            FROM punch_staff WHERE {' AND '.join(conds)} ORDER BY department, name
+        """, params).fetchall()
+    headers    = ['員工代碼', '姓名', '部門', '職稱', '職務', '薪資制', '底薪', '投保薪資', '到職日', '狀態']
+    col_widths = [55, 55, 65, 65, 65, 45, 60, 65, 65, 40]
+    data = [[r['employee_code'] or '', r['name'], r['department'] or '', r['role'] or '',
+             r['position_title'] or '', '時薪' if r['salary_type'] == 'hourly' else '月薪',
+             f"{float(r['base_salary'] or 0):,.0f}", f"{float(r['insured_salary'] or 0):,.0f}",
+             str(r['hire_date']) if r['hire_date'] else '',
+             '在職' if r['active'] else '離職']
+            for r in rows]
+    buf = _build_pdf('員工資料表', f'製表：{_date.today().isoformat()}  共 {len(data)} 人',
+                     headers, col_widths, data, landscape=True)
+    return _pdf_response(buf, 'staff_list.pdf')
+
+
+@bp.route('/api/export/training/pdf', methods=['GET'])
+@login_required
+def api_export_training_pdf():
+    staff_id = request.args.get('staff_id', ''); category = request.args.get('category', '')
+    conds, params = ['TRUE'], []
+    if staff_id: conds.append("tr.staff_id=%s"); params.append(int(staff_id))
+    if category: conds.append("tr.category=%s"); params.append(category)
+    with get_db() as conn:
+        rows = conn.execute(f"""
+            SELECT tr.*, ps.name AS staff_name, ps.department
+            FROM training_records tr JOIN punch_staff ps ON tr.staff_id = ps.id
+            WHERE {' AND '.join(conds)} ORDER BY tr.expiry_date ASC NULLS LAST, ps.name
+        """, params).fetchall()
+    CATEGORY_ZH = {'safety': '安全衛生', 'fire': '消防', 'food': '食品衛生',
+                   'professional': '專業技能', 'general': '一般訓練'}
+    today = _date.today()
+    headers    = ['員工姓名', '部門', '課程名稱', '類別', '完訓日期', '到期日', '剩餘天數', '狀態']
+    col_widths = [55, 60, 110, 60, 65, 65, 55, 55]
+    data = []
+    for r in rows:
+        days_left = ''; status = '無到期日'
+        if r['expiry_date']:
+            ed = r['expiry_date'] if hasattr(r['expiry_date'], 'year') else _date.fromisoformat(str(r['expiry_date']))
+            days_left = str((ed - today).days)
+            if (ed - today).days < 0: status = '已過期'
+            elif (ed - today).days <= 60: status = '即將到期'
+            else: status = '有效'
+        data.append([r['staff_name'], r['department'] or '', r['course_name'],
+                     CATEGORY_ZH.get(r['category'], r['category']),
+                     str(r['completed_date']) if r['completed_date'] else '',
+                     str(r['expiry_date']) if r['expiry_date'] else '',
+                     days_left, status])
+    buf = _build_pdf('訓練記錄', f'製表：{_date.today().isoformat()}  共 {len(data)} 筆',
+                     headers, col_widths, data, landscape=True)
+    return _pdf_response(buf, 'training_records.pdf')
+
+
+@bp.route('/api/export/expense/pdf', methods=['GET'])
+@login_required
+def api_export_expense_pdf():
+    month = request.args.get('month', ''); staff_id = request.args.get('staff_id', '')
+    status = request.args.get('status', '')
+    conds, params = ['TRUE'], []
+    if month:    conds.append("to_char(ec.expense_date,'YYYY-MM')=%s"); params.append(month)
+    if staff_id: conds.append("ec.staff_id=%s");                        params.append(int(staff_id))
+    if status:   conds.append("ec.status=%s");                          params.append(status)
+    with get_db() as conn:
+        rows = conn.execute(f"""
+            SELECT ec.*, ps.name as staff_name, ps.employee_code, ps.department
+            FROM expense_claims ec JOIN punch_staff ps ON ps.id = ec.staff_id
+            WHERE {' AND '.join(conds)} ORDER BY ec.expense_date DESC
+        """, params).fetchall()
+    STATUS_LABEL = {'approved': '已核准', 'rejected': '已退回', 'pending': '待審核'}
+    headers    = ['員工代碼', '姓名', '部門', '費用日期', '標題', '金額', '說明', '狀態']
+    col_widths = [50, 55, 60, 65, 100, 60, 110, 45]
+    data = [[r['employee_code'] or '', r['staff_name'], r['department'] or '',
+             str(r['expense_date']) if r.get('expense_date') else '',
+             r['title'] or '', f"{float(r['amount'] or 0):,.0f}",
+             r['note'] or '', STATUS_LABEL.get(r['status'], r['status'])]
+            for r in rows]
+    label = month or 'all'
+    buf = _build_pdf(f'{label} 費用報帳', f'製表：{_date.today().isoformat()}  共 {len(data)} 筆',
+                     headers, col_widths, data, landscape=True)
+    return _pdf_response(buf, f'expense_{label}.pdf')
+
+
+@bp.route('/api/export/withholding/pdf', methods=['GET'])
+@require_module('salary')
+def api_export_withholding_pdf():
+    from blueprints.finance import _get_finance_settings
+    year = request.args.get('year', str(_date.today().year))
+    fs   = _get_finance_settings()
+    company_name = fs.get('company_name', '')
+    with get_db() as conn:
+        rows = conn.execute("""
+            SELECT ps.name, ps.national_id, ps.address,
+                   COALESCE(SUM(sr.allowance_total), 0) AS gross_salary,
+                   COALESCE(SUM(sr.income_tax_withheld), 0) AS tax_withheld,
+                   COALESCE(AVG(sr.insured_salary), 0) AS avg_insured
+            FROM salary_records sr JOIN punch_staff ps ON ps.id = sr.staff_id
+            WHERE sr.month LIKE %s AND sr.status='confirmed'
+            GROUP BY ps.name, ps.national_id, ps.address ORDER BY ps.name
+        """, (f'{year}-%',)).fetchall()
+    def supp_nhi(gross, insured):
+        base = float(gross) - float(insured) * 12
+        return max(0, round(base * 0.0211, 0)) if base > 0 else 0
+    headers    = ['#', '姓名', '身分證字號', '年度薪資合計', '補充健保費', '扣繳稅額']
+    col_widths = [25, 60, 80, 80, 80, 70]
+    data = [[str(i), r['name'], r['national_id'] or '—',
+             f"{float(r['gross_salary']):,.0f}",
+             f"{supp_nhi(r['gross_salary'], r['avg_insured']):,.0f}",
+             f"{float(r['tax_withheld']):,.0f}"]
+            for i, r in enumerate(rows, 1)]
+    subtitle = f"扣繳義務人：{company_name}　製表：{_date.today().isoformat()}  共 {len(data)} 人"
+    buf = _build_pdf(f'{year} 年度薪資所得扣繳憑單（所得類別50）', subtitle,
+                     headers, col_widths, data)
+    return _pdf_response(buf, f'withholding_{year}.pdf')
 
 
 # ── EDI Exports ────────────────────────────────────────────────────

@@ -426,3 +426,37 @@ def api_export_performance():
         for r in rows
     ], len(headers), number_cols={7, 8, 9})
     return _xl_response(wb, f'performance_{period or "all"}.xlsx')
+
+
+@bp.route('/api/export/performance/pdf', methods=['GET'])
+@login_required
+def api_export_performance_pdf():
+    """匯出績效考核 PDF"""
+    from blueprints.exports import _build_pdf, _pdf_response
+    from datetime import date as _date
+    period   = request.args.get('period', '')
+    staff_id = request.args.get('staff_id', '')
+    conds, params = ['TRUE'], []
+    if period:   conds.append("pr.period_label ILIKE %s"); params.append(f'%{period}%')
+    if staff_id: conds.append("pr.staff_id=%s"); params.append(int(staff_id))
+    with get_db() as conn:
+        rows = conn.execute(f"""
+            SELECT pr.*, ps.name AS staff_name, ps.employee_code, ps.department, ps.role,
+                   pt.name AS template_name
+            FROM performance_reviews pr
+            JOIN punch_staff ps ON ps.id = pr.staff_id
+            LEFT JOIN performance_templates pt ON pt.id = pr.template_id
+            WHERE {' AND '.join(conds)} ORDER BY pr.reviewed_at DESC
+        """, params).fetchall()
+    headers    = ['代碼', '姓名', '部門', '考核期間', '分數', '滿分', '%', '等級', '考核人', '考核日期']
+    col_widths = [45, 55, 60, 70, 40, 40, 40, 40, 55, 75]
+    data = [[r['employee_code'] or '', r['staff_name'], r['department'] or '',
+             r['period_label'] or '',
+             str(float(r['total_score'] or 0)), str(float(r['max_score'] or 100)),
+             str(round(float(r['total_score'] or 0) / float(r['max_score'] or 100) * 100, 1)),
+             r['grade'] or '', r['reviewer'] or '',
+             str(r['reviewed_at'])[:10] if r.get('reviewed_at') else '']
+            for r in rows]
+    buf = _build_pdf('績效考核報表', f'製表：{_date.today().isoformat()}  共 {len(data)} 筆',
+                     headers, col_widths, data, landscape=True)
+    return _pdf_response(buf, f'performance_{period or "all"}.pdf')

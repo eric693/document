@@ -9,3 +9,5 @@ PyJWT>=2.8.0
 simpleeval>=0.9.13
 webauthn>=2.0.0
 cryptography>=42.0.0
+python-dotenv
+reportlab>=4.0.0
