@@ -15,6 +15,15 @@ from blueprints.notifications import _notify_review_result
 bp = Blueprint('salary', __name__)
 
 
+def _round_money(x):
+    """金額一律四捨五入到整數（無小數點）。使用 ROUND_HALF_UP（0.5 進位）。"""
+    from decimal import Decimal, ROUND_HALF_UP
+    try:
+        return int(Decimal(str(float(x or 0))).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+    except Exception:
+        return 0
+
+
 # ─── DB init ────────────────────────────────────────────────────────────────
 
 def init_salary_db():
@@ -43,6 +52,7 @@ def init_salary_db():
         "ALTER TABLE salary_records ADD COLUMN IF NOT EXISTS whole_day_leave_days  NUMERIC(5,1)  DEFAULT 0",
         "ALTER TABLE salary_records ADD COLUMN IF NOT EXISTS hourly_base_pay       NUMERIC(12,2) DEFAULT 0",
         "ALTER TABLE salary_records ADD COLUMN IF NOT EXISTS actual_work_hours     NUMERIC(8,2)  DEFAULT 0",
+        "ALTER TABLE salary_records ADD COLUMN IF NOT EXISTS leave_hours           NUMERIC(8,2)  DEFAULT 0",
         """CREATE TABLE IF NOT EXISTS salary_records (
             id              SERIAL PRIMARY KEY,
             staff_id        INT REFERENCES punch_staff(id) ON DELETE CASCADE,
@@ -133,7 +143,7 @@ def salary_record_row(row):
     for f in ['base_salary','insured_salary','work_days','actual_days','leave_days',
               'unpaid_days','ot_pay','allowance_total','deduction_total','net_pay',
               'income_tax_withheld','absent_days','whole_day_leave_days',
-              'hourly_base_pay','actual_work_hours']:
+              'hourly_base_pay','actual_work_hours','leave_hours']:
         if d.get(f) is not None: d[f] = float(d[f])
     if isinstance(d.get('items'), str):
         try: d['items'] = _json.loads(d['items'])
@@ -170,13 +180,13 @@ def _eval_formula(formula, base_salary, insured_salary, service_years, extra=Non
             def _sub_code(m):
                 code = m.group(0)
                 return str(float(item_amounts[code])) if code in item_amounts else code
-            processed = _re.sub(r'\b\d{2}\b', _sub_code, formula)
+            processed = _re.sub(r'(?<![.\d])\b\d{2}\b(?![.\d])', _sub_code, formula)
         from simpleeval import simple_eval
         result = float(simple_eval(processed, names=ctx))
         if result != result or abs(result) == float('inf'):  # NaN or Inf
             logging.warning(f"[FORMULA] 無效結果(NaN/Inf): formula={formula!r} ctx={ctx}")
             return 0.0
-        return round(result, 2)
+        return _round_money(result)
     except ZeroDivisionError:
         logging.error(f"[FORMULA] 除以零: formula={formula!r}")
         return 0.0
@@ -341,7 +351,7 @@ def _auto_generate_salary(conn, staff, month, work_days=None):
         actual_work_hours, punch_work_days, punch_details = _calc_punch_hours(
             conn, staff['id'], month
         )
-        hourly_base_pay = round(actual_work_hours * hourly_rate, 2)
+        hourly_base_pay = _round_money(actual_work_hours * hourly_rate)
     else:
         hourly_base_pay = 0.0
 
@@ -521,7 +531,7 @@ def _auto_generate_salary(conn, staff, month, work_days=None):
                     h1 = min(overtime_h, 2.0)
                     h2 = min(max(0.0, overtime_h - 2.0), 2.0)
                     h3 = max(0.0, overtime_h - 4.0)
-                    ot_pay += round(hourly_rate * (h1 * rate1 + h2 * rate2 + h3 * rate3), 2)
+                    ot_pay += _round_money(hourly_rate * (h1 * rate1 + h2 * rate2 + h3 * rate3))
 
         if insured_salary == 0:
             insured_salary = round(hourly_rate * daily_hours * 30, 0)
@@ -548,14 +558,15 @@ def _auto_generate_salary(conn, staff, month, work_days=None):
             calc_amt = _eval_formula(it['formula'] or '', base_salary or insured_salary,
                                      insured_salary, service_years, _formula_extra, _item_amounts_by_code)
             amt, overridden = _apply_override(it['id'], calc_amt)
+            amt = _round_money(amt)
             note = f'手動設定 ${amt}' if overridden else (it['formula'] or '')
             items.append({
                 'id': it['id'], 'name': it['name'], 'type': 'deduction',
-                'amount': round(amt, 2), 'formula': it['formula'] or '',
+                'amount': amt, 'formula': it['formula'] or '',
                 'calc_note': note,
             })
             if it.get('code'):
-                _item_amounts_by_code[it['code']] = round(amt, 2)
+                _item_amounts_by_code[it['code']] = amt
             deduction_total += amt
 
     else:
@@ -576,26 +587,28 @@ def _auto_generate_salary(conn, staff, month, work_days=None):
             if formula:
                 calc_amt = _eval_formula(formula, base_salary, insured_salary, service_years, _formula_extra, _item_amounts_by_code)
             amt, overridden = _apply_override(it['id'], calc_amt)
+            amt = _round_money(amt)
             note = f'手動設定 ${amt}' if overridden else formula
             items.append({
                 'id':        it['id'],
                 'name':      it['name'],
                 'type':      it['item_type'],
-                'amount':    round(amt, 2),
+                'amount':    amt,
                 'formula':   formula,
                 'calc_note': note,
             })
             if it.get('code'):
-                _item_amounts_by_code[it['code']] = round(amt, 2)
+                _item_amounts_by_code[it['code']] = amt
             if it['item_type'] == 'allowance':
                 allowance_total += amt
             else:
                 deduction_total += amt
 
     if ot_pay > 0:
+        ot_pay = _round_money(ot_pay)
         items.append({
             'id': 'ot', 'name': '加班費（申請）', 'type': 'allowance',
-            'amount': round(ot_pay, 2), 'formula': '',
+            'amount': ot_pay, 'formula': '',
             'calc_note': '核准加班費合計',
         })
         allowance_total += ot_pay
@@ -606,7 +619,7 @@ def _auto_generate_salary(conn, staff, month, work_days=None):
                 r['leave_name'] for r in leave_rows
                 if float(r['pay_rate']) < 0.001 and not r['is_hourly']
             ))
-            deduct = round(daily_wage * unpaid_days, 2)
+            deduct = _round_money(daily_wage * unpaid_days)
             items.append({
                 'id': 'unpaid', 'name': f'無薪假扣款（{leave_names}）', 'type': 'deduction',
                 'amount': deduct, 'formula': '',
@@ -619,7 +632,7 @@ def _auto_generate_salary(conn, staff, month, work_days=None):
                 r['leave_name'] for r in leave_rows
                 if float(r['pay_rate']) < 0.001 and r['is_hourly']
             ))
-            deduct = round(hourly_wage * _hourly_unpaid_hours, 2)
+            deduct = _round_money(hourly_wage * _hourly_unpaid_hours)
             items.append({
                 'id': 'unpaid_hourly', 'name': f'無薪假扣款-小時（{leave_names}）', 'type': 'deduction',
                 'amount': deduct, 'formula': '',
@@ -632,7 +645,7 @@ def _auto_generate_salary(conn, staff, month, work_days=None):
                 r['leave_name'] for r in leave_rows
                 if 0.001 <= float(r['pay_rate']) <= 0.999 and not r['is_hourly']
             ))
-            deduct = round(daily_wage * half_pay_days * 0.5, 2)
+            deduct = _round_money(daily_wage * half_pay_days * 0.5)
             items.append({
                 'id': 'halfpay', 'name': f'半薪假扣款（{leave_names}）', 'type': 'deduction',
                 'amount': deduct, 'formula': '',
@@ -645,7 +658,7 @@ def _auto_generate_salary(conn, staff, month, work_days=None):
                 r['leave_name'] for r in leave_rows
                 if 0.001 <= float(r['pay_rate']) <= 0.999 and r['is_hourly']
             ))
-            deduct = round(hourly_wage * _hourly_halfpay_hours * 0.5, 2)
+            deduct = _round_money(hourly_wage * _hourly_halfpay_hours * 0.5)
             items.append({
                 'id': 'halfpay_hourly', 'name': f'半薪假扣款-小時（{leave_names}）', 'type': 'deduction',
                 'amount': deduct, 'formula': '',
@@ -654,7 +667,7 @@ def _auto_generate_salary(conn, staff, month, work_days=None):
             deduction_total += deduct
 
     if absent_days > 0:
-        deduct = round(daily_wage * absent_days, 2)
+        deduct = _round_money(daily_wage * absent_days)
         sample = '、'.join(_absent_date_list[:3]) + ('等' if absent_days > 3 else '')
         items.append({
             'id': 'absent', 'name': f'缺勤扣款（{absent_days} 天）', 'type': 'deduction',
@@ -670,7 +683,7 @@ def _auto_generate_salary(conn, staff, month, work_days=None):
     )
     income_tax_withheld = 0.0
     if _sal_cfg['auto_income_tax'] and _existing_tax == 0 and allowance_total > _TAX_THRESHOLD:
-        income_tax_withheld = round(allowance_total * 0.05, 0)
+        income_tax_withheld = _round_money(allowance_total * 0.05)
         items.append({
             'id': 'income_tax', 'name': '薪資所得扣繳稅款', 'type': 'deduction',
             'amount': income_tax_withheld, 'formula': '',
@@ -680,7 +693,7 @@ def _auto_generate_salary(conn, staff, month, work_days=None):
     else:
         income_tax_withheld = _existing_tax
 
-    net_pay = round(allowance_total - deduction_total, 2)
+    net_pay = _round_money(allowance_total - deduction_total)
 
     return {
         'staff_id':              staff['id'],
@@ -694,12 +707,13 @@ def _auto_generate_salary(conn, staff, month, work_days=None):
         'work_days':             total_work_days,
         'actual_days':           max(0, actual_days - absent_days),
         'leave_days':            leave_days,
+        'leave_hours':           _total_leave_hours,
         'unpaid_days':           unpaid_days,
         'absent_days':           absent_days,
         'whole_day_leave_days':  whole_day_leave_days,
         'ot_pay':                ot_pay,
-        'allowance_total':       round(allowance_total, 2),
-        'deduction_total':       round(deduction_total, 2),
+        'allowance_total':       _round_money(allowance_total),
+        'deduction_total':       _round_money(deduction_total),
         'net_pay':               net_pay,
         'income_tax_withheld':   income_tax_withheld,
         'items':                 items,
@@ -894,14 +908,14 @@ def api_salary_generate():
                   (staff_id, month, base_salary, insured_salary, work_days, actual_days,
                    leave_days, unpaid_days, ot_pay, allowance_total, deduction_total,
                    net_pay, income_tax_withheld, items, status, updated_at,
-                   absent_days, whole_day_leave_days, hourly_base_pay, actual_work_hours)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,'draft',NOW(),%s,%s,%s,%s)
+                   absent_days, whole_day_leave_days, hourly_base_pay, actual_work_hours, leave_hours)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,'draft',NOW(),%s,%s,%s,%s,%s)
                 ON CONFLICT (staff_id, month) DO UPDATE
                   SET base_salary=%s, insured_salary=%s, work_days=%s, actual_days=%s,
                       leave_days=%s, unpaid_days=%s, ot_pay=%s, allowance_total=%s,
                       deduction_total=%s, net_pay=%s, income_tax_withheld=%s, items=%s::jsonb,
                       absent_days=%s, whole_day_leave_days=%s, hourly_base_pay=%s, actual_work_hours=%s,
-                      status='draft', updated_at=NOW()
+                      leave_hours=%s, status='draft', updated_at=NOW()
             """, (
                 data['staff_id'], month, data['base_salary'], data['insured_salary'],
                 data['work_days'], data['actual_days'], data['leave_days'], data['unpaid_days'],
@@ -909,11 +923,13 @@ def api_salary_generate():
                 data['net_pay'], data['income_tax_withheld'], items_json,
                 data.get('absent_days', 0), data.get('whole_day_leave_days', 0),
                 data.get('hourly_base_pay', 0), data.get('actual_work_hours', 0),
+                data.get('leave_hours', 0),
                 data['base_salary'], data['insured_salary'], data['work_days'], data['actual_days'],
                 data['leave_days'], data['unpaid_days'], data['ot_pay'], data['allowance_total'],
                 data['deduction_total'], data['net_pay'], data['income_tax_withheld'], items_json,
                 data.get('absent_days', 0), data.get('whole_day_leave_days', 0),
                 data.get('hourly_base_pay', 0), data.get('actual_work_hours', 0),
+                data.get('leave_hours', 0),
             ))
             generated += 1
     return jsonify({'ok': True, 'generated': generated, 'skipped': skipped, 'month': month})
@@ -1174,9 +1190,9 @@ def api_formula_preview():
             if _f:
                 _amt = _eval_formula(_f, base_salary, insured_salary, service_years, extra, preview_amounts)
             if _it.get('code'):
-                preview_amounts[_it['code']] = round(_amt, 2)
+                preview_amounts[_it['code']] = _round_money(_amt)
         result = _eval_formula(formula, base_salary, insured_salary, service_years, extra, preview_amounts)
-        return jsonify({'result': round(result, 2), 'error': None})
+        return jsonify({'result': _round_money(result), 'error': None})
     except Exception as e:
         return jsonify({'result': None, 'error': str(e)})
 
@@ -1223,14 +1239,12 @@ def api_salary_pdf(rid):
         <tr>
           <td>{esc_h(i['name'])}</td>
           <td class="num green">{money(i['amount'])}</td>
-          <td class="note">{esc_h(i.get('calc_note',''))}</td>
         </tr>""" for i in allow_items)
 
     deduct_rows = ''.join(f"""
         <tr>
           <td>{esc_h(i['name'])}</td>
           <td class="num red">-{money(i['amount'])}</td>
-          <td class="note">{esc_h(i.get('calc_note',''))}</td>
         </tr>""" for i in deduct_items)
 
     punch_table = ''
@@ -1258,6 +1272,8 @@ def api_salary_pdf(rid):
                   f"出勤 {d.get('actual_days',0)} 天 / 工作日 {d.get('work_days',0)} 天")
     if float(d.get('leave_days',0)) > 0:
         attend_str += f"，請假 {d.get('leave_days',0)} 天"
+    if float(d.get('leave_hours',0)) > 0:
+        attend_str += f"，時數請假 {d.get('leave_hours',0)} 小時"
     if float(d.get('unpaid_days',0)) > 0:
         attend_str += f"（無薪 {d.get('unpaid_days',0)} 天）"
 
@@ -1269,52 +1285,52 @@ def api_salary_pdf(rid):
 <style>
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
   body {{ font-family: 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
-          font-size: 13px; color: #1a2340; background: #fff; padding: 32px; }}
+          font-size: 11px; color: #1a2340; background: #fff; padding: 18px 22px; }}
   .header {{ display: flex; justify-content: space-between; align-items: flex-start;
-             border-bottom: 3px solid #1a2340; padding-bottom: 16px; margin-bottom: 24px; }}
-  .company {{ font-size: 20px; font-weight: 800; color: #1a2340; }}
-  .slip-title {{ font-size: 14px; color: #666; margin-top: 4px; }}
-  .staff-info {{ font-size: 12px; color: #444; text-align: right; line-height: 1.8; }}
-  .summary {{ display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 24px; }}
-  .sum-card {{ border: 1.5px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; text-align: center; }}
-  .sum-label {{ font-size: 10px; color: #888; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .06em; }}
-  .sum-val {{ font-size: 22px; font-weight: 800; font-family: 'DM Mono', monospace; }}
+             border-bottom: 2px solid #1a2340; padding-bottom: 7px; margin-bottom: 10px; }}
+  .company {{ font-size: 16px; font-weight: 800; color: #1a2340; }}
+  .slip-title {{ font-size: 11px; color: #666; margin-top: 2px; }}
+  .staff-info {{ font-size: 10px; color: #444; text-align: right; line-height: 1.45; }}
+  .summary {{ display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 8px; }}
+  .sum-card {{ border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 10px; text-align: center; }}
+  .sum-label {{ font-size: 9px; color: #888; margin-bottom: 1px; letter-spacing: .04em; }}
+  .sum-val {{ font-size: 16px; font-weight: 800; font-family: 'DM Mono', monospace; }}
   .sum-val.green {{ color: #2e9e6b; }}
   .sum-val.red   {{ color: #d64242; }}
   .sum-val.navy  {{ color: #1a2340; }}
-  .attend {{ background: #f8fafc; border-radius: 6px; padding: 8px 14px;
-             font-size: 12px; color: #666; margin-bottom: 20px; }}
-  h3 {{ font-size: 12px; font-weight: 700; color: #888; letter-spacing: .08em;
-        text-transform: uppercase; margin: 20px 0 8px; }}
-  table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
-  th {{ background: #f1f5f9; padding: 8px 12px; text-align: left;
-        font-size: 11px; font-weight: 700; color: #666;
-        border-bottom: 2px solid #e2e8f0; }}
-  td {{ padding: 7px 12px; border-bottom: 1px solid #f0f2f8; }}
+  .attend {{ background: #f8fafc; border-radius: 5px; padding: 5px 10px;
+             font-size: 10px; color: #666; margin-bottom: 8px; }}
+  .cols {{ display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }}
+  h3 {{ font-size: 10px; font-weight: 700; color: #888; letter-spacing: .06em;
+        margin: 6px 0 3px; }}
+  table {{ width: 100%; border-collapse: collapse; font-size: 11px; }}
+  th {{ background: #f1f5f9; padding: 4px 8px; text-align: left;
+        font-size: 10px; font-weight: 700; color: #666;
+        border-bottom: 1px solid #e2e8f0; }}
+  td {{ padding: 3px 8px; border-bottom: 1px solid #f0f2f8; }}
   td.num {{ text-align: right; font-family: 'DM Mono', monospace; font-weight: 600; }}
-  td.note {{ font-size: 11px; color: #999; }}
   td.green {{ color: #2e9e6b; }}
   td.red   {{ color: #d64242; }}
-  tfoot td {{ font-weight: 700; background: #f8fafc; border-top: 2px solid #e2e8f0; }}
-  .net-row td {{ font-size: 16px; font-weight: 800; background: #1a2340; color: #fff; }}
-  .net-row td.num {{ color: #f0c040; font-size: 20px; }}
-  .footer {{ margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0;
-             display: flex; justify-content: space-between; font-size: 11px; color: #999; }}
-  .sign-area {{ display: flex; gap: 48px; margin-top: 40px; }}
-  .sign-box {{ flex: 1; border-top: 1px solid #ccc; padding-top: 6px; font-size: 11px; color: #666; }}
+  tfoot td {{ font-weight: 700; background: #f8fafc; border-top: 1px solid #e2e8f0; }}
+  .net-row td {{ font-size: 13px; font-weight: 800; background: #1a2340; color: #fff; padding: 6px 8px; }}
+  .net-row td.num {{ color: #f0c040; font-size: 15px; }}
+  .footer {{ margin-top: 10px; padding-top: 6px; border-top: 1px solid #e2e8f0;
+             display: flex; justify-content: space-between; font-size: 9px; color: #999; }}
+  .sign-area {{ display: flex; gap: 32px; margin-top: 14px; }}
+  .sign-box {{ flex: 1; border-top: 1px solid #ccc; padding-top: 4px; font-size: 10px; color: #666; }}
   @media print {{
-    body {{ padding: 16px; }}
-    @page {{ margin: 12mm; size: A4; }}
+    body {{ padding: 8px 10px; }}
+    @page {{ margin: 8mm; size: A4; }}
     .no-print {{ display: none !important; }}
   }}
 </style>
 </head>
 <body>
 
-<div class="no-print" style="text-align:right;margin-bottom:20px">
+<div class="no-print" style="text-align:right;margin-bottom:10px">
   <button onclick="window.print()"
-    style="padding:10px 24px;background:#1a2340;color:#fff;border:none;border-radius:6px;
-           font-size:13px;font-weight:700;cursor:pointer">列印 / 儲存 PDF</button>
+    style="padding:8px 20px;background:#1a2340;color:#fff;border:none;border-radius:6px;
+           font-size:12px;font-weight:700;cursor:pointer">列印 / 儲存 PDF</button>
 </div>
 
 <div class="header">
@@ -1347,30 +1363,35 @@ def api_salary_pdf(rid):
 
 <div class="attend">{attend_str}</div>
 
-<h3>津貼項目</h3>
-<table>
-  <thead><tr><th>項目</th><th style="text-align:right">金額</th><th>計算說明</th></tr></thead>
-  <tbody>{allow_rows}</tbody>
-  <tfoot>
-    <tr><td><strong>津貼合計</strong></td><td class="num green"><strong>{money(d.get('allowance_total',0))}</strong></td><td></td></tr>
-  </tfoot>
-</table>
+<div class="cols">
+  <div>
+    <h3>津貼項目</h3>
+    <table>
+      <thead><tr><th>項目</th><th style="text-align:right">金額</th></tr></thead>
+      <tbody>{allow_rows}</tbody>
+      <tfoot>
+        <tr><td><strong>津貼合計</strong></td><td class="num green"><strong>{money(d.get('allowance_total',0))}</strong></td></tr>
+      </tfoot>
+    </table>
+  </div>
+  <div>
+    <h3>扣除項目</h3>
+    <table>
+      <thead><tr><th>項目</th><th style="text-align:right">金額</th></tr></thead>
+      <tbody>{deduct_rows if deduct_rows else '<tr><td colspan="2" style="color:#ccc;text-align:center;padding:12px">無扣除項目</td></tr>'}</tbody>
+      <tfoot>
+        <tr><td><strong>扣除合計</strong></td><td class="num red"><strong>-{money(d.get('deduction_total',0))}</strong></td></tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
 
-<h3>扣除項目</h3>
-<table>
-  <thead><tr><th>項目</th><th style="text-align:right">金額</th><th>計算說明</th></tr></thead>
-  <tbody>{deduct_rows if deduct_rows else '<tr><td colspan="3" style="color:#ccc;text-align:center;padding:12px">無扣除項目</td></tr>'}</tbody>
-  <tfoot>
-    <tr><td><strong>扣除合計</strong></td><td class="num red"><strong>-{money(d.get('deduction_total',0))}</strong></td><td></td></tr>
-  </tfoot>
-</table>
-
-<table style="margin-top:12px">
+<table style="margin-top:8px">
   <tbody>
     <tr class="net-row">
       <td><strong>實領金額</strong></td>
       <td class="num">{money(d.get('net_pay',0))}</td>
-      <td style="color:#ccc;font-size:11px">= 津貼 {money(d.get('allowance_total',0))} - 扣除 {money(d.get('deduction_total',0))}</td>
+      <td style="color:#aebbd6;font-size:10px">= 津貼 {money(d.get('allowance_total',0))} - 扣除 {money(d.get('deduction_total',0))}</td>
     </tr>
   </tbody>
 </table>
