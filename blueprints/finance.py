@@ -292,6 +292,17 @@ def _month_last_day(year, month):
     return _cal.monthrange(int(year), int(month))[1]
 
 
+def _parse_period(year, month):
+    """驗證並標準化年月，格式錯誤回 None（避免畸形輸入造成 SQL 日期轉型 500）。"""
+    try:
+        y, m = int(year), int(month)
+    except (TypeError, ValueError):
+        return None
+    if not (1900 <= y <= 2200 and 1 <= m <= 12):
+        return None
+    return f"{y:04d}-{m:02d}"
+
+
 def _compute_statements(year, month):
     """Compute all three financial statements for the given year/month."""
     from collections import defaultdict
@@ -550,7 +561,9 @@ def api_finance_record_delete(rid):
 @bp.route('/api/finance/summary/<year>/<month>', methods=['GET'])
 @require_module('finance')
 def api_finance_summary(year, month):
-    period = f"{year}-{month.zfill(2)}"
+    period = _parse_period(year, month)
+    if not period:
+        return jsonify({'error': '年月格式錯誤'}), 400
     with get_db() as conn:
         totals = conn.execute("""
             SELECT type, COALESCE(SUM(amount),0) as total
@@ -744,6 +757,8 @@ def api_finance_settings_save():
 @bp.route('/api/finance/statements/<year>/<month>', methods=['GET'])
 @require_module('finance')
 def api_finance_statements(year, month):
+    if not _parse_period(year, month):
+        return jsonify({'error': '年月格式錯誤'}), 400
     try:
         return jsonify(_compute_statements(year, month))
     except Exception as e:
@@ -756,6 +771,8 @@ def api_finance_export_statements(year, month):
     import openpyxl
     from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 
+    if not _parse_period(year, month):
+        return jsonify({'error': '年月格式錯誤'}), 400
     d  = _compute_statements(year, month)
     co = d['company_name']
     ry = d['roc_year']
