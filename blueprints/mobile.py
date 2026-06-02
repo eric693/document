@@ -397,18 +397,26 @@ def mobile_salary():
     staff_id = int(u['sub'])
     with get_db() as conn:
         rows = conn.execute(
-            """SELECT id, period_year, period_month, base_salary, bonus, deductions,
-                      net_salary, status, paid_at, created_at
-               FROM salary_records WHERE staff_id=%s ORDER BY period_year DESC, period_month DESC LIMIT 12""",
+            """SELECT id, month, base_salary, allowance_total, deduction_total,
+                      net_pay, status, confirmed_at, created_at
+               FROM salary_records
+               WHERE staff_id=%s AND status IN ('confirmed', 'paid')
+               ORDER BY month DESC LIMIT 12""",
             (staff_id,)
         ).fetchall()
     data = []
     for r in rows:
         d = dict(r)
-        for k in ('paid_at', 'created_at'):
+        # 對應 App 既有欄位名稱
+        d['period_year']  = int(str(d['month'])[:4]) if d.get('month') else None
+        d['period_month'] = int(str(d['month'])[5:7]) if d.get('month') else None
+        d['bonus']        = float(d['allowance_total'] or 0)
+        d['deductions']   = float(d['deduction_total'] or 0)
+        d['net_salary']   = float(d['net_pay'] or 0)
+        d['paid_at']      = str(d['confirmed_at']) if d.get('confirmed_at') else None
+        d['base_salary']  = float(d['base_salary'] or 0)
+        for k in ('confirmed_at', 'created_at'):
             if d.get(k): d[k] = str(d[k])
-        for k in ('base_salary', 'bonus', 'deductions', 'net_salary'):
-            if d.get(k) is not None: d[k] = float(d[k])
         data.append(d)
     return jsonify(data)
 

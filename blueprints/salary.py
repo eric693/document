@@ -740,18 +740,11 @@ def api_my_payslip():
             FROM salary_records sr
             JOIN punch_staff ps ON ps.id = sr.staff_id
             WHERE sr.staff_id = %s AND sr.month = %s
+              AND sr.status IN ('confirmed', 'paid')
         """, (sid, month)).fetchone()
         if not row:
-            staff = conn.execute("SELECT * FROM punch_staff WHERE id=%s", (sid,)).fetchone()
-            if not staff:
-                return jsonify({'error': '找不到員工資料'}), 404
-            data = _auto_generate_salary(conn, dict(staff), month)
-            data['staff_name']    = staff['name']
-            data['staff_role']    = staff['role'] or ''
-            data['employee_code'] = staff['employee_code'] or ''
-            data['department']    = staff['department'] or ''
-            data['is_preview']    = True
-            return jsonify(data)
+            # 草稿或尚未產生者一律不顯示給員工，須待人資確認後才發布
+            return jsonify({'error': '本月薪資單尚未發布，請待人資確認後再查看'}), 404
     d = salary_record_row(row)
     d['staff_name']    = row['staff_name']
     d['staff_role']    = row['staff_role']

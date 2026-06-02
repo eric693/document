@@ -458,14 +458,14 @@ def _line_query_salary(staff, user_id):
             row = conn.execute("""
                 SELECT month, net_pay, base_salary, allowance_total, deduction_total, status
                 FROM salary_records
-                WHERE staff_id=%s
+                WHERE staff_id=%s AND status IN ('confirmed', 'paid')
                 ORDER BY month DESC LIMIT 1
             """, (staff['id'],)).fetchone()
     except Exception as e:
         _send_line_punch(user_id, f'查詢失敗：{e}')
         return
     if not row:
-        _send_line_punch(user_id, f'📊 {staff["name"]}\n尚無薪資記錄。')
+        _send_line_punch(user_id, f'📊 {staff["name"]}\n目前尚無已發布的薪資單。')
         return
     status_map = {'draft': '草稿', 'confirmed': '已確認', 'paid': '已發放'}
     _send_line_punch(user_id,
