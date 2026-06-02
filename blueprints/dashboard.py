@@ -183,18 +183,6 @@ def api_dashboard():
         total_staff = conn.execute(
             "SELECT COUNT(*) as c FROM punch_staff WHERE active=TRUE"
         ).fetchone()['c']
-        clocked_in = conn.execute("""
-            SELECT COUNT(DISTINCT staff_id) as c FROM punch_records
-            WHERE punch_type='in' AND (punched_at AT TIME ZONE 'Asia/Taipei')::date = %s
-        """, (today,)).fetchone()['c']
-        clocked_out = conn.execute("""
-            SELECT COUNT(DISTINCT staff_id) as c FROM punch_records
-            WHERE punch_type='out' AND (punched_at AT TIME ZONE 'Asia/Taipei')::date = %s
-        """, (today,)).fetchone()['c']
-        on_leave_today = conn.execute("""
-            SELECT COUNT(DISTINCT staff_id) as c FROM leave_requests
-            WHERE status='approved' AND start_date <= %s AND end_date >= %s
-        """, (today, today)).fetchone()['c']
         today_detail_rows = conn.execute("""
             SELECT ps.id, ps.name, ps.role,
                    MAX(CASE WHEN pr.punch_type='in'  THEN to_char(pr.punched_at AT TIME ZONE 'Asia/Taipei','HH24:MI') END) as clock_in,
@@ -214,7 +202,8 @@ def api_dashboard():
                 WHERE lr.staff_id=%s AND lr.status='approved'
                   AND lr.start_date <= %s AND lr.end_date >= %s LIMIT 1
             """, (r['id'], today, today)).fetchone()
-            if r['clock_in']:
+            if r['clock_in'] or r['clock_out']:
+                # 只要今天有任一打卡（含只打下班卡、忘記打上班卡）即視為出勤
                 status = 'done' if r['clock_out'] else 'working'
                 status_label = '已下班' if r['clock_out'] else '上班中'
             elif leave_row:
@@ -226,6 +215,14 @@ def api_dashboard():
                 'clock_in': r['clock_in'] or '', 'clock_out': r['clock_out'] or '',
                 'punch_count': r['punch_count'], 'status': status, 'status_label': status_label,
             })
+        # 以在職員工明細為準計算各狀態人數，確保卡片數字與明細表一致
+        working_cnt = sum(1 for d in today_detail if d['status'] == 'working')
+        done_cnt    = sum(1 for d in today_detail if d['status'] == 'done')
+        leave_cnt   = sum(1 for d in today_detail if d['status'] == 'leave')
+        absent_cnt  = sum(1 for d in today_detail if d['status'] == 'absent')
+        clocked_in  = working_cnt + done_cnt   # 今日有出勤（任一打卡）人數
+        clocked_out = done_cnt
+        on_leave_today = leave_cnt
         pending_punch = conn.execute("SELECT COUNT(*) as c FROM punch_requests WHERE status='pending'").fetchone()['c']
         pending_ot    = conn.execute("SELECT COUNT(*) as c FROM overtime_requests WHERE status='pending'").fetchone()['c']
         pending_sched = conn.execute("SELECT COUNT(*) as c FROM schedule_requests WHERE status IN ('pending','modified_pending')").fetchone()['c']
@@ -272,9 +269,9 @@ def api_dashboard():
     return jsonify({
         'month': month, 'today': str(today), 'is_current_month': month == today.strftime('%Y-%m'),
         'today_summary': {
-            'total': total_staff, 'working': clocked_in - clocked_out,
+            'total': total_staff, 'working': working_cnt,
             'clocked_in': clocked_in, 'clocked_out': clocked_out,
-            'on_leave': on_leave_today, 'absent': total_staff - clocked_in - on_leave_today,
+            'on_leave': on_leave_today, 'absent': absent_cnt,
         },
         'today_detail': today_detail,
         'pending': {'punch': pending_punch, 'ot': pending_ot, 'sched': pending_sched,
