@@ -35,7 +35,9 @@ def api_shift_types_public():
 @bp.route('/api/shifts/types', methods=['POST'])
 @require_module('sched')
 def api_shift_type_create():
-    b = request.get_json(force=True)
+    b = request.get_json(force=True) or {}
+    if not str(b.get('name','')).strip() or not b.get('start_time') or not b.get('end_time'):
+        return jsonify({'error': '請填寫班別名稱與上下班時間'}), 400
     with get_db() as conn:
         row = conn.execute("""
             INSERT INTO shift_types (name, start_time, end_time, color, departments, sort_order)
@@ -49,7 +51,9 @@ def api_shift_type_create():
 @bp.route('/api/shifts/types/<int:sid>', methods=['PUT'])
 @require_module('sched')
 def api_shift_type_update(sid):
-    b = request.get_json(force=True)
+    b = request.get_json(force=True) or {}
+    if not str(b.get('name','')).strip() or not b.get('start_time') or not b.get('end_time'):
+        return jsonify({'error': '請填寫班別名稱與上下班時間'}), 400
     with get_db() as conn:
         row = conn.execute("""
             UPDATE shift_types

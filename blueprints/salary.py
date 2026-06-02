@@ -794,7 +794,9 @@ def api_salary_items_list():
 @bp.route('/api/salary/items', methods=['POST'])
 @require_module('salary')
 def api_salary_item_create():
-    b = request.get_json(force=True)
+    b = request.get_json(force=True) or {}
+    if not str(b.get('name','')).strip():
+        return jsonify({'error': '請填寫薪資項目名稱'}), 400
     with get_db() as conn:
         row = conn.execute("""
             INSERT INTO salary_items (name, item_type, formula, amount, description, color, sort_order, code)
@@ -809,7 +811,9 @@ def api_salary_item_create():
 @bp.route('/api/salary/items/<int:iid>', methods=['PUT'])
 @require_module('salary')
 def api_salary_item_update(iid):
-    b = request.get_json(force=True)
+    b = request.get_json(force=True) or {}
+    if not str(b.get('name','')).strip():
+        return jsonify({'error': '請填寫薪資項目名稱'}), 400
     with get_db() as conn:
         row = conn.execute("""
             UPDATE salary_items SET name=%s, item_type=%s, formula=%s, amount=%s,

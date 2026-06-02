@@ -272,7 +272,9 @@ def api_leave_types_public():
 @bp.route('/api/leave/types', methods=['POST'])
 @require_module('leave')
 def api_leave_type_create():
-    b = request.get_json(force=True)
+    b = request.get_json(force=True) or {}
+    if not str(b.get('name','')).strip() or not str(b.get('code','')).strip():
+        return jsonify({'error': '請填寫假別名稱與代碼'}), 400
     with get_db() as conn:
         row = conn.execute("""
             INSERT INTO leave_types (name,code,pay_rate,max_days,description,color,sort_order,require_cert)
@@ -287,7 +289,9 @@ def api_leave_type_create():
 @bp.route('/api/leave/types/<int:tid>', methods=['PUT'])
 @require_module('leave')
 def api_leave_type_update(tid):
-    b = request.get_json(force=True)
+    b = request.get_json(force=True) or {}
+    if not str(b.get('name','')).strip() or not str(b.get('code','')).strip():
+        return jsonify({'error': '請填寫假別名稱與代碼'}), 400
     with get_db() as conn:
         row = conn.execute("""
             UPDATE leave_types SET name=%s,code=%s,pay_rate=%s,max_days=%s,
@@ -754,13 +758,15 @@ def api_document_image(doc_id):
     if not doc or not doc['image_data']:
         return jsonify({'error': '找不到圖片'}), 404
     from flask import Response
-    fname = (doc['filename'] or '').replace('"', '')
+    from html import escape as _esc
+    fname = _esc(doc['filename'] or '', quote=True)   # 跳脫檔名，避免惡意檔名造成 XSS
+    src   = doc['image_data'] if str(doc['image_data']).startswith('data:image/') else ''
     html = (
         '<!doctype html><html><head><meta charset="utf-8">'
         f'<title>{fname}</title>'
         '<style>body{margin:0;background:#111;display:flex;justify-content:center;align-items:flex-start}'
         'img{max-width:100%;height:auto}</style></head>'
-        f'<body><img src="{doc["image_data"]}" alt="{fname}"></body></html>'
+        f'<body><img src="{src}" alt="{fname}"></body></html>'
     )
     return Response(html, mimetype='text/html')
 

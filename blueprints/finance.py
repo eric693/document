@@ -534,7 +534,9 @@ def api_finance_record_create():
 @bp.route('/api/finance/records/<int:rid>', methods=['PUT'])
 @require_module('finance')
 def api_finance_record_update(rid):
-    b = request.get_json(force=True)
+    b = request.get_json(force=True) or {}
+    if not b.get('record_date'):
+        return jsonify({'error': '請填寫日期'}), 400
     with get_db() as conn:
         row = conn.execute("""
             UPDATE finance_records SET

@@ -528,59 +528,6 @@ def api_export_staff():
     return _xl_response(wb, 'staff_list.xlsx')
 
 
-# ── Training Export ────────────────────────────────────────────────
-
-@bp.route('/api/export/training', methods=['GET'])
-@login_required
-def api_export_training():
-    staff_id = request.args.get('staff_id', ''); category = request.args.get('category', '')
-    conds, params = ['TRUE'], []
-    if staff_id: conds.append("tr.staff_id=%s"); params.append(int(staff_id))
-    if category: conds.append("tr.category=%s"); params.append(category)
-    with get_db() as conn:
-        rows = conn.execute(f"""
-            SELECT tr.*, ps.name AS staff_name, ps.department
-            FROM training_records tr JOIN punch_staff ps ON tr.staff_id = ps.id
-            WHERE {' AND '.join(conds)} ORDER BY tr.expiry_date ASC NULLS LAST, ps.name
-        """, params).fetchall()
-    import openpyxl
-    from openpyxl.styles import PatternFill, Alignment, Border, Side
-    today = _date.today()
-    CATEGORY_ZH = {'safety': '安全衛生', 'fire': '消防', 'food': '食品衛生',
-                   'professional': '專業技能', 'general': '一般訓練'}
-    wb, ws = _xl_workbook('訓練記錄')
-    headers = ['員工姓名', '部門', '課程名稱', '類別', '完訓日期', '到期日', '證書號碼', '剩餘天數', '狀態', '備註']
-    widths  = [10, 12, 24, 10, 12, 12, 16, 9, 10, 20]
-    _xl_write_header(ws, headers, widths)
-    warn_fill = PatternFill('solid', fgColor='FFF3CD')
-    err_fill  = PatternFill('solid', fgColor='FDECEA')
-    even_fill = PatternFill('solid', fgColor='F4F6FA')
-    thin = Border(left=Side(style='thin', color='CCCCCC'), right=Side(style='thin', color='CCCCCC'),
-                  top=Side(style='thin',  color='CCCCCC'), bottom=Side(style='thin', color='CCCCCC'))
-    center = Alignment(horizontal='center', vertical='center')
-    left_al = Alignment(horizontal='left', vertical='center')
-    for ri, r in enumerate(rows, 2):
-        expiry = str(r['expiry_date']) if r['expiry_date'] else ''
-        days_left = ''; status = '無到期日'; color = None
-        if r['expiry_date']:
-            ed = r['expiry_date'] if hasattr(r['expiry_date'], 'year') else _date.fromisoformat(str(r['expiry_date']))
-            days_left = (ed - today).days
-            if days_left < 0: status = '已過期'; color = 'err'
-            elif days_left <= 60: status = '即將到期'; color = 'warn'
-            else: status = '有效'
-        vals = [r['staff_name'], r['department'] or '',
-                r['course_name'], CATEGORY_ZH.get(r['category'], r['category']),
-                str(r['completed_date']) if r['completed_date'] else '',
-                expiry, r['certificate_no'] or '', days_left, status, r['note'] or '']
-        fill = err_fill if color == 'err' else warn_fill if color == 'warn' else (even_fill if ri % 2 == 0 else None)
-        for ci, v in enumerate(vals, 1):
-            cell = ws.cell(row=ri, column=ci, value=v)
-            if fill: cell.fill = fill
-            cell.border = thin
-            cell.alignment = center if isinstance(v, (int, float, type(None))) else left_al
-    return _xl_response(wb, 'training_records.xlsx')
-
-
 # ── Expense Export ─────────────────────────────────────────────────
 
 @bp.route('/api/export/expense', methods=['GET'])
