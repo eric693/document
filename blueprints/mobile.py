@@ -218,12 +218,12 @@ def mobile_punch_status():
     if u['role'] != 'employee':
         return jsonify({'error': '僅員工可查詢'}), 403
     staff_id = int(u['sub'])
-    today = date.today().isoformat()
+    today = _dt.now(TW_TZ).date().isoformat()
     with get_db() as conn:
         rows = conn.execute(
             """SELECT punch_type, punched_at, note, gps_distance, location_name
                FROM punch_records WHERE staff_id=%s
-               AND punched_at::date = %s::date ORDER BY punched_at""",
+               AND (punched_at AT TIME ZONE 'Asia/Taipei')::date = %s::date ORDER BY punched_at""",
             (staff_id, today)
         ).fetchall()
     data = []
@@ -479,11 +479,11 @@ def mobile_overtime_list():
 @bp.route('/api/mobile/admin/dashboard', methods=['GET'])
 @mobile_admin_required
 def mobile_admin_dashboard():
-    today = date.today().isoformat()
+    today = _dt.now(TW_TZ).date().isoformat()
     with get_db() as conn:
         total_staff   = conn.execute("SELECT COUNT(*) AS n FROM punch_staff WHERE active=TRUE").fetchone()['n']
         punched_today = conn.execute(
-            "SELECT COUNT(DISTINCT staff_id) AS n FROM punch_records WHERE punched_at::date=%s::date", (today,)
+            "SELECT COUNT(DISTINCT staff_id) AS n FROM punch_records WHERE (punched_at AT TIME ZONE 'Asia/Taipei')::date=%s::date", (today,)
         ).fetchone()['n']
         pending_leaves = conn.execute(
             "SELECT COUNT(*) AS n FROM leave_requests WHERE status='pending'"
@@ -492,9 +492,9 @@ def mobile_admin_dashboard():
             "SELECT COUNT(*) AS n FROM overtime_requests WHERE status='pending'"
         ).fetchone()['n']
         rows_7d = conn.execute(
-            """SELECT punched_at::date AS day, COUNT(DISTINCT staff_id) AS cnt
+            """SELECT (punched_at AT TIME ZONE 'Asia/Taipei')::date AS day, COUNT(DISTINCT staff_id) AS cnt
                FROM punch_records
-               WHERE punched_at::date >= (CURRENT_DATE - INTERVAL '6 days')
+               WHERE (punched_at AT TIME ZONE 'Asia/Taipei')::date >= ((NOW() AT TIME ZONE 'Asia/Taipei')::date - INTERVAL '6 days')
                GROUP BY day ORDER BY day""",
         ).fetchall()
     attendance_trend = [{'date': str(r['day']), 'count': r['cnt']} for r in rows_7d]
@@ -508,14 +508,14 @@ def mobile_admin_dashboard():
 @bp.route('/api/mobile/admin/attendance/today', methods=['GET'])
 @mobile_admin_required
 def mobile_admin_attendance_today():
-    today = date.today().isoformat()
+    today = _dt.now(TW_TZ).date().isoformat()
     with get_db() as conn:
         staff_all = conn.execute(
             "SELECT id, name, department, position_title FROM punch_staff WHERE active=TRUE ORDER BY name"
         ).fetchall()
         records = conn.execute(
             """SELECT staff_id, punch_type, punched_at
-               FROM punch_records WHERE punched_at::date=%s::date ORDER BY punched_at""",
+               FROM punch_records WHERE (punched_at AT TIME ZONE 'Asia/Taipei')::date=%s::date ORDER BY punched_at""",
             (today,)
         ).fetchall()
     by_staff = defaultdict(list)
@@ -652,9 +652,9 @@ def mobile_admin_anomalies():
             "SELECT id, name, department FROM punch_staff WHERE active=TRUE ORDER BY name"
         ).fetchall()
         records = conn.execute(
-            """SELECT staff_id, punch_type, punched_at::date AS day
+            """SELECT staff_id, punch_type, (punched_at AT TIME ZONE 'Asia/Taipei')::date AS day
                FROM punch_records
-               WHERE date_trunc('month', punched_at) = %s::date""",
+               WHERE date_trunc('month', punched_at AT TIME ZONE 'Asia/Taipei') = %s::date""",
             (f'{y}-{m:02d}-01',)
         ).fetchall()
     by_staff = defaultdict(set)

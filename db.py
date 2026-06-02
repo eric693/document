@@ -219,6 +219,12 @@ def init_db():
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS termination_reason TEXT DEFAULT ''",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS pending_punch_type TEXT",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS pending_punch_at TIMESTAMPTZ",
+        "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS bank_code TEXT DEFAULT ''",
+        "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS bank_name TEXT DEFAULT ''",
+        "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS bank_branch TEXT DEFAULT ''",
+        "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS bank_account TEXT DEFAULT ''",
+        "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS account_holder TEXT DEFAULT ''",
+        "ALTER TABLE shift_types ADD COLUMN IF NOT EXISTS departments TEXT DEFAULT ''",
         # punch_records
         "ALTER TABLE punch_records ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION",
         "ALTER TABLE punch_records ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION",

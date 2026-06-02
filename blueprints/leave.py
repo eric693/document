@@ -737,6 +737,18 @@ def api_leave_upload_cert():
 def api_document_image(doc_id):
     if not (session.get('logged_in') or session.get('punch_staff_id')):
         return jsonify({'error': 'unauthorized'}), 401
+    # 員工僅能檢視自己的請假/報帳附件，避免越權查看他人診斷證明、收據
+    if not session.get('logged_in'):
+        sid = session.get('punch_staff_id')
+        with get_db() as conn:
+            owned = conn.execute("""
+                SELECT 1 FROM leave_requests  WHERE document_id=%s AND staff_id=%s
+                UNION ALL
+                SELECT 1 FROM expense_claims  WHERE document_id=%s AND staff_id=%s
+                LIMIT 1
+            """, (doc_id, sid, doc_id, sid)).fetchone()
+        if not owned:
+            return jsonify({'error': 'forbidden'}), 403
     with get_db() as conn:
         doc = conn.execute("SELECT image_data, filename FROM finance_documents WHERE id=%s", (doc_id,)).fetchone()
     if not doc or not doc['image_data']:
