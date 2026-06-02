@@ -244,6 +244,10 @@ def _handle_line_punch_event(event, cfg):
                     except Exception as _e:
                         print(f"[LINE PUNCH] location qr error: {_e}")
                 _pending_line_punches[user_id] = punch_type
+                with get_db() as conn:
+                    conn.execute(
+                        "UPDATE punch_staff SET pending_punch_type=%s, pending_punch_at=NOW() WHERE id=%s",
+                        (punch_type, staff['id']))
             else:
                 _do_line_punch(staff, user_id, None, None, punch_type, PUNCH_LABEL)
         elif text in ('查餘假', '餘假', '假期', '查假', '特休'):
@@ -275,19 +279,41 @@ def _do_line_punch(staff, user_id, lat, lng, forced_type, PUNCH_LABEL):
     TW = _tz3(_td3(hours=8))
 
     # Determine punch type
+    # 暫存的打卡意圖（按「上班/下班」後等待傳送位置）改以 DB 持久化，
+    # 避免 worker 重啟導致記憶體 dict 遺失而誤判（按上班卻記成下班）。
+    pending = _pending_line_punches.get(user_id)
+    if not pending and not forced_type:
+        with get_db() as conn:
+            prow = conn.execute("""
+                SELECT pending_punch_type FROM punch_staff
+                WHERE id=%s AND pending_punch_type IS NOT NULL
+                  AND pending_punch_at > NOW() - INTERVAL '15 minutes'
+            """, (staff['id'],)).fetchone()
+        if prow:
+            pending = prow['pending_punch_type']
+
+    from_pending = False
     if forced_type:
         punch_type = forced_type
-    elif user_id in _pending_line_punches:
-        punch_type = _pending_line_punches.pop(user_id)
+    elif pending:
+        punch_type = pending
+        from_pending = True
     else:
         with get_db() as conn:
             last = conn.execute("""
-                SELECT punch_type, punched_at FROM punch_records
+                SELECT punch_type, punched_at,
+                       (punched_at AT TIME ZONE 'Asia/Taipei')::date AS last_day,
+                       (NOW() AT TIME ZONE 'Asia/Taipei')::date       AS today_tw
+                FROM punch_records
                 WHERE staff_id=%s
                   AND punched_at >= NOW() - INTERVAL '24 hours'
                 ORDER BY punched_at DESC LIMIT 1
             """, (staff['id'],)).fetchone()
         if not last:
+            punch_type = 'in'
+        elif last['punch_type'] == 'in' and last['last_day'] != last['today_tw']:
+            # 上一筆「上班」是昨天的（多半是忘記下班打卡）；今天應視為新的上班，
+            # 而非自動翻成下班，否則早上按上班會被記成下班。
             punch_type = 'in'
         elif last['punch_type'] == 'in':
             punch_type = 'out'
@@ -347,6 +373,12 @@ def _do_line_punch(staff, user_id, lat, lng, forced_type, PUNCH_LABEL):
               (staff_id, punch_type, latitude, longitude, gps_distance, location_name)
             VALUES (%s,%s,%s,%s,%s,%s)
         """, (staff['id'], punch_type, lat, lng, gps_distance, matched_name))
+        # 打卡成功才清除暫存意圖（GPS 失敗提前 return 時保留，方便重送位置）
+        if from_pending or _pending_line_punches.get(user_id):
+            _pending_line_punches.pop(user_id, None)
+            conn.execute(
+                "UPDATE punch_staff SET pending_punch_type=NULL, pending_punch_at=NULL WHERE id=%s",
+                (staff['id'],))
 
     now      = _dt3.now(TW)
     gps_info = f'\n📍 {matched_name} ({gps_distance}m)' if gps_distance is not None else ''

@@ -217,6 +217,8 @@ def init_db():
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS finance_synced BOOLEAN DEFAULT FALSE",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS terminated_at DATE",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS termination_reason TEXT DEFAULT ''",
+        "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS pending_punch_type TEXT",
+        "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS pending_punch_at TIMESTAMPTZ",
         # punch_records
         "ALTER TABLE punch_records ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION",
         "ALTER TABLE punch_records ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION",
