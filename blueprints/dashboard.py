@@ -550,3 +550,58 @@ def api_attendance_anomalies():
     sev_order = {'error': 0, 'warning': 1, 'info': 2}
     anomalies.sort(key=lambda x: (sev_order.get(x['severity'], 9), x['date']))
     return jsonify({'anomalies': anomalies, 'count': len(anomalies), 'checked_from': str(date_from)})
+
+
+@bp.route('/api/attendance/batch-fix', methods=['POST'])
+@login_required
+def api_attendance_batch_fix():
+    """批次補登忘記上/下班打卡——依當日排班的應上/下班時間補上缺漏的打卡。"""
+    from flask import session
+    b     = request.get_json(force=True) or {}
+    items = b.get('items') or []
+    if not items:
+        return jsonify({'error': '未選取任何項目'}), 400
+    manual_by = session.get('admin_display_name', '管理員')
+    fixed, skipped = [], []
+    with get_db() as conn:
+        for it in items:
+            staff_id = it.get('staff_id')
+            ds       = str(it.get('date') or '')
+            atype    = it.get('type')
+            if atype not in ('missing_in', 'missing_out') or not staff_id or not ds:
+                skipped.append({**it, 'reason': '資料不完整'}); continue
+            punch_type = 'in' if atype == 'missing_in' else 'out'
+            shift = conn.execute("""
+                SELECT st.start_time, st.end_time
+                FROM shift_assignments sa JOIN shift_types st ON st.id = sa.shift_type_id
+                WHERE sa.staff_id=%s AND sa.shift_date=%s
+                LIMIT 1
+            """, (staff_id, ds)).fetchone()
+            if not shift:
+                skipped.append({**it, 'reason': '當日無排班，請手動補登'}); continue
+            t = shift['start_time'] if punch_type == 'in' else shift['end_time']
+            if not t:
+                skipped.append({**it, 'reason': '排班未設定上/下班時間'}); continue
+            exists = conn.execute("""
+                SELECT 1 FROM punch_records
+                WHERE staff_id=%s AND punch_type=%s
+                  AND (punched_at AT TIME ZONE 'Asia/Taipei')::date=%s
+                LIMIT 1
+            """, (staff_id, punch_type, ds)).fetchone()
+            if exists:
+                skipped.append({**it, 'reason': '已有打卡記錄'}); continue
+            ts = str(t)[:5]
+            try:
+                hh, mm   = map(int, ts.split(':'))
+                y, mo, d = map(int, ds.split('-'))
+                punched_at = _dt(y, mo, d, hh, mm, tzinfo=TW_TZ)
+            except Exception:
+                skipped.append({**it, 'reason': '時間格式錯誤'}); continue
+            conn.execute("""
+                INSERT INTO punch_records
+                  (staff_id, punch_type, punched_at, note, is_manual, manual_by)
+                VALUES (%s,%s,%s,%s,TRUE,%s)
+            """, (staff_id, punch_type, punched_at, f'批次補登（依排班 {ts}）', manual_by))
+            fixed.append({**it, 'time': ts})
+    return jsonify({'fixed': len(fixed), 'skipped': len(skipped),
+                    'fixed_items': fixed, 'skipped_items': skipped})

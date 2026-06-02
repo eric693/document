@@ -223,6 +223,7 @@ def init_db():
         "ALTER TABLE punch_records ADD COLUMN IF NOT EXISTS gps_distance INT",
         "ALTER TABLE punch_records ADD COLUMN IF NOT EXISTS location_name TEXT DEFAULT ''",
         "ALTER TABLE punch_records ADD COLUMN IF NOT EXISTS is_manual BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE punch_records ADD COLUMN IF NOT EXISTS manual_by TEXT DEFAULT ''",
         # overtime_requests
         "ALTER TABLE overtime_requests ADD COLUMN IF NOT EXISTS start_time TEXT DEFAULT ''",
         "ALTER TABLE overtime_requests ADD COLUMN IF NOT EXISTS end_time TEXT DEFAULT ''",

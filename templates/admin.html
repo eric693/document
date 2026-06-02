@@ -700,6 +700,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="punch-panel-anomaly" style="display:none">
       <div class="filter-bar" style="margin-bottom:16px;gap:12px;flex-wrap:wrap">
         <span style="font-size:13px;color:var(--muted)">自動偵測近 7 天出勤異常（遲到、早退、缺打卡、今日未出勤）</span>
+        <button class="btn btn-primary btn-sm" onclick="batchFixAnomalies()" id="anomaly-batchfix-btn" disabled>批次補登（依排班）</button>
         <span style="flex:1"></span>
         <span class="filter-label">月份</span>
         <input class="filter-input" type="month" id="anomaly-export-month" style="width:140px">
@@ -710,8 +711,8 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <div class="card">
         <div class="table-wrap">
           <table>
-            <thead><tr><th>嚴重程度</th><th>員工</th><th>部門</th><th>日期</th><th>異常類型</th><th>說明</th></tr></thead>
-            <tbody id="anomaly-tbody"><tr><td colspan="6" class="empty-state"><div class="empty-state-text">請稍候...</div></td></tr></tbody>
+            <thead><tr><th style="width:36px;text-align:center"><input type="checkbox" id="anomaly-checkall" onclick="toggleAllAnomalies(this.checked)" title="全選可補登"></th><th>嚴重程度</th><th>員工</th><th>部門</th><th>日期</th><th>異常類型</th><th>說明</th></tr></thead>
+            <tbody id="anomaly-tbody"><tr><td colspan="7" class="empty-state"><div class="empty-state-text">請稍候...</div></td></tr></tbody>
           </table>
         </div>
       </div>
@@ -4019,29 +4020,73 @@ function switchPunchTab(tab) {
 // ── 異常告警（打卡面板） ──────────────────────────────────────
 let _mstatsData = [];
 
+let _anomalyData = [];
+
 async function loadPunchAnomalies() {
   const tb = document.getElementById('anomaly-tbody');
-  tb.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="empty-state-text">載入中...</div></td></tr>';
+  tb.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="empty-state-text">載入中...</div></td></tr>';
   const { ok, data } = await api('/api/attendance/anomalies', {}, true);
-  if (!ok || !data.anomalies || !data.anomalies.length) {
-    tb.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="empty-state-text">近 7 天無異常記錄</div></td></tr>';
+  _anomalyData = (ok && data.anomalies) ? data.anomalies : [];
+  const checkAll = document.getElementById('anomaly-checkall');
+  if (checkAll) checkAll.checked = false;
+  if (!_anomalyData.length) {
+    tb.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="empty-state-text">近 7 天無異常記錄</div></td></tr>';
+    updateBatchFixBtn();
     return;
   }
   const SEV_LABEL = { error: '嚴重', warning: '警告', info: '提示' };
   const SEV_COLOR = { error: 'var(--red)', warning: '#e07b2a', info: 'var(--accent)' };
   const SEV_BG    = { error: '#fff5f5', warning: '#fffbeb', info: '#eff6ff' };
   const dot = document.getElementById('tabdot-anomaly');
-  const errCount = data.anomalies.filter(a => a.severity === 'error').length;
+  const errCount = _anomalyData.filter(a => a.severity === 'error').length;
   if (dot) { dot.style.display = errCount ? '' : 'none'; dot.textContent = errCount || ''; }
-  tb.innerHTML = data.anomalies.map(a => `
+  tb.innerHTML = _anomalyData.map((a, i) => {
+    const fixable = (a.type === 'missing_in' || a.type === 'missing_out');
+    const cb = fixable
+      ? `<input type="checkbox" class="anomaly-cb" data-idx="${i}" onclick="updateBatchFixBtn()">`
+      : '';
+    return `
     <tr style="background:${SEV_BG[a.severity]||'#fff'}">
+      <td style="text-align:center">${cb}</td>
       <td><span style="color:${SEV_COLOR[a.severity]||'inherit'};font-weight:700">${SEV_LABEL[a.severity]||a.severity}</span></td>
       <td style="font-weight:600">${escHtml(a.name||'')}</td>
       <td style="color:var(--muted)">${escHtml(a.department||a.role||'')}</td>
       <td style="font-family:'DM Mono',monospace;font-size:12px">${a.date||''}</td>
       <td>${escHtml(a.label||'')}</td>
       <td style="font-size:12px;color:var(--muted)">${escHtml(a.detail||'')}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
+  updateBatchFixBtn();
+}
+
+function toggleAllAnomalies(checked) {
+  document.querySelectorAll('.anomaly-cb').forEach(cb => { cb.checked = checked; });
+  updateBatchFixBtn();
+}
+
+function updateBatchFixBtn() {
+  const n = document.querySelectorAll('.anomaly-cb:checked').length;
+  const btn = document.getElementById('anomaly-batchfix-btn');
+  if (btn) { btn.disabled = n === 0; btn.textContent = n ? `批次補登（依排班）${n} 筆` : '批次補登（依排班）'; }
+}
+
+async function batchFixAnomalies() {
+  const items = [...document.querySelectorAll('.anomaly-cb:checked')]
+    .map(cb => _anomalyData[+cb.dataset.idx])
+    .filter(Boolean)
+    .map(a => ({ staff_id: a.staff_id, date: a.date, type: a.type, name: a.name }));
+  if (!items.length) { showToast('請先勾選要補登的項目', true); return; }
+  if (!confirm(`將依「當日排班的應上/下班時間」補登 ${items.length} 筆打卡，確定執行？\n（當日無排班者會自動跳過，需手動補登）`)) return;
+  const { ok, data } = await api('/api/attendance/batch-fix', apiJSON({ items }));
+  if (!ok) { showToast((data && data.error) || '批次補登失敗', true); return; }
+  let msg = `已補登 ${data.fixed} 筆`;
+  if (data.skipped) {
+    const reasons = (data.skipped_items || []).map(s => `${s.name||''} ${s.date||''}（${s.reason||''}）`).join('\n');
+    msg += `，跳過 ${data.skipped} 筆`;
+    if (reasons) alert(`批次補登完成：\n已補登 ${data.fixed} 筆\n跳過 ${data.skipped} 筆：\n${reasons}`);
+  }
+  showToast(msg, data.fixed ? 'success' : true);
+  await loadPunchAnomalies();
 }
 
 // ── 月出勤統計 ────────────────────────────────────────────────
