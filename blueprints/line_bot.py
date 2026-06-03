@@ -244,10 +244,13 @@ def _handle_line_punch_event(event, cfg):
                     except Exception as _e:
                         print(f"[LINE PUNCH] location qr error: {_e}")
                 _pending_line_punches[user_id] = punch_type
-                with get_db() as conn:
-                    conn.execute(
-                        "UPDATE punch_staff SET pending_punch_type=%s, pending_punch_at=NOW() WHERE id=%s",
-                        (punch_type, staff['id']))
+                try:
+                    with get_db() as conn:
+                        conn.execute(
+                            "UPDATE punch_staff SET pending_punch_type=%s, pending_punch_at=NOW() WHERE id=%s",
+                            (punch_type, staff['id']))
+                except Exception as e:
+                    print(f"[LINE PUNCH] save pending failed (ignored): {e}")
             else:
                 _do_line_punch(staff, user_id, None, None, punch_type, PUNCH_LABEL)
         elif text in ('查餘假', '餘假', '假期', '查假', '特休'):
@@ -283,14 +286,17 @@ def _do_line_punch(staff, user_id, lat, lng, forced_type, PUNCH_LABEL):
     # 避免 worker 重啟導致記憶體 dict 遺失而誤判（按上班卻記成下班）。
     pending = _pending_line_punches.get(user_id)
     if not pending and not forced_type:
-        with get_db() as conn:
-            prow = conn.execute("""
-                SELECT pending_punch_type FROM punch_staff
-                WHERE id=%s AND pending_punch_type IS NOT NULL
-                  AND pending_punch_at > NOW() - INTERVAL '15 minutes'
-            """, (staff['id'],)).fetchone()
-        if prow:
-            pending = prow['pending_punch_type']
+        try:
+            with get_db() as conn:
+                prow = conn.execute("""
+                    SELECT pending_punch_type FROM punch_staff
+                    WHERE id=%s AND pending_punch_type IS NOT NULL
+                      AND pending_punch_at > NOW() - INTERVAL '15 minutes'
+                """, (staff['id'],)).fetchone()
+            if prow:
+                pending = prow['pending_punch_type']
+        except Exception as e:
+            print(f"[LINE PUNCH] read pending failed (ignored): {e}")
 
     from_pending = False
     if forced_type:
@@ -373,12 +379,18 @@ def _do_line_punch(staff, user_id, lat, lng, forced_type, PUNCH_LABEL):
               (staff_id, punch_type, latitude, longitude, gps_distance, location_name)
             VALUES (%s,%s,%s,%s,%s,%s)
         """, (staff['id'], punch_type, lat, lng, gps_distance, matched_name))
-        # 打卡成功才清除暫存意圖（GPS 失敗提前 return 時保留，方便重送位置）
-        if from_pending or _pending_line_punches.get(user_id):
-            _pending_line_punches.pop(user_id, None)
-            conn.execute(
-                "UPDATE punch_staff SET pending_punch_type=NULL, pending_punch_at=NULL WHERE id=%s",
-                (staff['id'],))
+
+    # 打卡成功後才清除暫存意圖；獨立交易且 best-effort——
+    # 即使 pending 欄位不存在或更新失敗，也絕不能影響已完成的打卡。
+    if from_pending or _pending_line_punches.get(user_id):
+        _pending_line_punches.pop(user_id, None)
+        try:
+            with get_db() as conn:
+                conn.execute(
+                    "UPDATE punch_staff SET pending_punch_type=NULL, pending_punch_at=NULL WHERE id=%s",
+                    (staff['id'],))
+        except Exception as e:
+            print(f"[LINE PUNCH] clear pending failed (ignored): {e}")
 
     now      = _dt3.now(TW)
     gps_info = f'\n📍 {matched_name} ({gps_distance}m)' if gps_distance is not None else ''
