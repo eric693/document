@@ -1005,14 +1005,17 @@ def api_line_punch_config_get():
 @bp.route('/api/line-punch/config', methods=['PUT'])
 @login_required
 def api_line_punch_config_put():
-    b       = request.get_json(force=True)
+    b       = request.get_json(force=True) or {}
     token   = b.get('channel_access_token', '').strip()
     secret  = b.get('channel_secret', '').strip()
     enabled = bool(b.get('enabled', False))
+    # 空值不覆蓋既有金鑰：欄位留白時沿用原值，避免誤把憑證清空（COALESCE NULLIF）
     with get_db() as conn:
         conn.execute("""
             UPDATE line_punch_config
-            SET channel_access_token=%s, channel_secret=%s, enabled=%s, updated_at=NOW()
+            SET channel_access_token = COALESCE(NULLIF(%s,''), channel_access_token),
+                channel_secret       = COALESCE(NULLIF(%s,''), channel_secret),
+                enabled=%s, updated_at=NOW()
             WHERE id=1
         """, (token, secret, enabled))
     return jsonify({'ok': True, 'enabled': enabled})
