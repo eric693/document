@@ -228,6 +228,17 @@ def _handle_line_punch_event(event, cfg):
             gps_required = pcfg['gps_required'] if pcfg else False
             if gps_required and locs:
                 from linebot.models import QuickReply, QuickReplyButton, LocationAction
+                # 先把打卡意圖持久化（記憶體 + 資料庫），再提示傳送位置。
+                # 順序很重要：提示送出後若 server 重啟，記憶體會遺失，但 DB 已保存意圖，
+                # 位置進來時才能正確判斷上班/下班，不致誤記（下班被記成上班）。
+                _pending_line_punches[user_id] = punch_type
+                try:
+                    with get_db() as conn:
+                        conn.execute(
+                            "UPDATE punch_staff SET pending_punch_type=%s, pending_punch_at=NOW() WHERE id=%s",
+                            (punch_type, staff['id']))
+                except Exception as e:
+                    print(f"[LINE PUNCH] save pending failed (ignored): {e}")
                 cfg_lp = get_line_punch_config()
                 if cfg_lp and cfg_lp.get('enabled') and cfg_lp.get('channel_access_token'):
                     qr = QuickReply(items=[QuickReplyButton(action=LocationAction(label='📍 傳送位置'))])
@@ -243,14 +254,6 @@ def _handle_line_punch_event(event, cfg):
                             _api.push_message(user_id, _msg)
                     except Exception as _e:
                         print(f"[LINE PUNCH] location qr error: {_e}")
-                _pending_line_punches[user_id] = punch_type
-                try:
-                    with get_db() as conn:
-                        conn.execute(
-                            "UPDATE punch_staff SET pending_punch_type=%s, pending_punch_at=NOW() WHERE id=%s",
-                            (punch_type, staff['id']))
-                except Exception as e:
-                    print(f"[LINE PUNCH] save pending failed (ignored): {e}")
             else:
                 _do_line_punch(staff, user_id, None, None, punch_type, PUNCH_LABEL)
         elif text in ('查餘假', '餘假', '假期', '查假', '特休'):
@@ -305,39 +308,20 @@ def _do_line_punch(staff, user_id, lat, lng, forced_type, PUNCH_LABEL):
         punch_type = pending
         from_pending = True
     else:
-        with get_db() as conn:
-            last = conn.execute("""
-                SELECT punch_type, punched_at,
-                       (punched_at AT TIME ZONE 'Asia/Taipei')::date AS last_day,
-                       (NOW() AT TIME ZONE 'Asia/Taipei')::date       AS today_tw
-                FROM punch_records
-                WHERE staff_id=%s
-                  AND punched_at >= NOW() - INTERVAL '24 hours'
-                ORDER BY punched_at DESC LIMIT 1
-            """, (staff['id'],)).fetchone()
-        if not last:
-            punch_type = 'in'
-        elif last['punch_type'] == 'in' and last['last_day'] != last['today_tw']:
-            # 上一筆「上班」是昨天的（多半是忘記下班打卡）；今天應視為新的上班，
-            # 而非自動翻成下班，否則早上按上班會被記成下班。
-            punch_type = 'in'
-        elif last['punch_type'] == 'in':
-            punch_type = 'out'
-        elif last['punch_type'] == 'break_out':
-            punch_type = 'break_in'
-        else:
-            now_utc = _dt3.now(_tz3.utc)
-            last_at = last['punched_at']
-            if last_at.tzinfo is None:
-                last_at = last_at.replace(tzinfo=_tz3.utc)
-            elapsed = int((now_utc - last_at).total_seconds())
-            if elapsed < 300:
-                _send_line_punch(user_id,
-                    f'⚠️ 您剛於 {elapsed} 秒前完成打卡\n'
-                    '若確認要重新上班，請等候 5 分鐘後再打卡，\n'
-                    '或使用「上班」指令強制打卡。')
-                return
-            punch_type = 'in'
+        # 收到位置，但找不到任何明確的打卡意圖
+        # （使用者直接傳位置，或先前點選的「上班/下班」意圖已遺失）。
+        # 過去這裡會「依最近一筆紀錄自動推斷」，但只要推斷錯誤，
+        # 就會把下班記成上班。為避免誤記，這裡不再猜測，改請使用者明確點選。
+        _send_line_with_quick_reply(user_id,
+            '收到您的位置 📍\n'
+            '但我不確定您要打哪一種卡，為避免記錯，請先點選下方按鈕：',
+            [
+                {'label': '上班', 'text': '上班'},
+                {'label': '下班', 'text': '下班'},
+                {'label': '休息', 'text': '休息'},
+                {'label': '回來', 'text': '回來'},
+            ])
+        return
 
     label = PUNCH_LABEL.get(punch_type, punch_type)
 
