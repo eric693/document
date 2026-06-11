@@ -947,6 +947,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         <button class="btn btn-primary btn-sm" id="leave-batch-approve" style="display:none" onclick="batchReview('leave','approve')">批次核准</button>
         <button class="btn btn-danger btn-sm"  id="leave-batch-reject"  style="display:none" onclick="batchReview('leave','reject')">批次退回</button>
       </div>
+      <div id="leave-pending-hint" style="display:none;margin-bottom:14px;padding:10px 14px;background:#fffbeb;border:1.5px solid #e07b2a;border-radius:10px;font-size:13px;color:#9a5b14;align-items:center;gap:10px;flex-wrap:wrap"></div>
       <div id="leave-req-list"></div>
     </div>
 
@@ -5419,6 +5420,29 @@ async function loadLeaveRequests() {
   leaveReqData = ok ? data : [];
   document.getElementById('leave-req-count').textContent = `共 ${leaveReqData.length} 筆`;
   renderLeaveRequests();
+  updateLeavePendingHint();
+}
+
+// 月份篩選會藏住其他月份的待審單（紅點計全部、列表只顯示當月）→ 主動提示
+async function updateLeavePendingHint() {
+  const hint = document.getElementById('leave-pending-hint');
+  const month = document.getElementById('leave-req-month').value;
+  if (!month) { hint.style.display = 'none'; return; }
+  const { ok, data } = await api('/api/leave/requests?status=pending', {}, true);
+  if (!ok || !Array.isArray(data)) { hint.style.display = 'none'; return; }
+  const hidden = data.filter(r => String(r.start_date || '').slice(0, 7) !== month);
+  if (!hidden.length) { hint.style.display = 'none'; return; }
+  const preview = hidden.slice(0, 3).map(r => `${r.staff_name} ${r.start_date}`).join('、');
+  hint.innerHTML = `⚠ 另有 <strong>${hidden.length}</strong> 筆待審假單不在 ${month}（${escHtml(preview)}${hidden.length > 3 ? '…' : ''}）
+    <button class="btn btn-outline btn-sm" onclick="showAllPendingLeave()">查看全部待審</button>`;
+  hint.style.display = 'flex';
+}
+
+function showAllPendingLeave() {
+  document.getElementById('leave-req-month').value = '';
+  document.getElementById('leave-req-status').value = 'pending';
+  document.getElementById('leave-req-staff').value = '';
+  loadLeaveRequests();
 }
 
 async function _refreshLeaveBalCache(year) {
