@@ -397,7 +397,8 @@ html,body{min-height:100%;background:var(--navy);font-family:"Noto Sans TC",sans
           <div style="margin-bottom:14px"><div class="fl">代理人（選填）</div><input class="fi" id="leave-sub" placeholder="例：王小明" style="margin-bottom:0"></div>
           <!-- 病假病單上傳 -->
           <div id="leave-cert-section" style="display:none;margin-bottom:14px;padding:12px;background:var(--bg);border-radius:8px;border:1.5px dashed var(--border)">
-            <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">病假需上傳病單</div>
+            <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px">此假別需上傳病單/證明</div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:8px">手邊還沒有病單？可先送出申請，之後在下方請假記錄中補上傳（補件前主管無法核准）</div>
             <input type="file" id="leave-cert-input" accept="image/*,.pdf" style="display:none" onchange="leaveCertSelected(event)">
             <button class="btn btn-outline btn-sm" onclick="document.getElementById('leave-cert-input').click()">選擇病單圖片</button>
             <div id="leave-cert-status" style="font-size:12px;color:var(--muted);margin-top:6px"></div>
@@ -409,6 +410,7 @@ html,body{min-height:100%;background:var(--navy);font-family:"Noto Sans TC",sans
         <!-- 我的請假記錄 -->
         <div class="section-label" style="margin-bottom:10px">我的請假記錄</div>
         <div id="my-leave-list"><div style="text-align:center;color:var(--muted);font-size:13px;padding:16px">載入中...</div></div>
+        <input type="file" id="leave-cert-late-input" accept="image/*,.pdf" style="display:none" onchange="lateCertSelected(event)">
       </div>
 
       <!-- 薪資單 tab -->
@@ -1848,6 +1850,38 @@ async function leaveCertSelected(event) {
   }
 }
 
+// 先請後補：對已送出的假單補上傳病單
+let _lateCertReqId = null;
+
+function lateCertPick(rid) {
+  _lateCertReqId = rid;
+  document.getElementById('leave-cert-late-input').click();
+}
+
+async function lateCertSelected(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file || !_lateCertReqId) return;
+  const rid = _lateCertReqId;
+  _lateCertReqId = null;
+  showToast('病單上傳中...', 'ok');
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    const up = await fetch('/api/leave/upload-cert', { method: 'POST', body: form });
+    const ud = await up.json();
+    if (!up.ok || ud.error) { showToast(ud.error || '上傳失敗，請重試', 'err'); return; }
+    const res  = await fetch(`/api/leave/my-requests/${rid}/document`, {
+      method: 'PUT', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ document_id: ud.document_id })
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || '補件失敗', 'err'); return; }
+    showToast('病單已補上傳，等待主管審核', 'ok');
+    await loadMyLeaveHistory();
+  } catch(e) { showToast('網路錯誤', 'err'); }
+}
+
 function _onLeaveTypeChange() {
   const sel  = document.getElementById('leave-type-sel');
   const opt  = sel.options[sel.selectedIndex];
@@ -1885,7 +1919,9 @@ async function submitLeaveRequest() {
   if (!leave_type_id) { showToast('請選擇假別', 'err'); return; }
   if (!reason) { showToast('請填寫請假原因', 'err'); return; }
   const selOpt = document.getElementById('leave-type-sel').options[document.getElementById('leave-type-sel').selectedIndex];
-  if (selOpt?.getAttribute('data-cert') === '1' && !_leaveCertDocId) { showToast('此假別需上傳病單/證明文件', 'err'); return; }
+  if (selOpt?.getAttribute('data-cert') === '1' && !_leaveCertDocId) {
+    if (!confirm('此假別需上傳病單/證明文件。\n可以先送出申請、之後再到「請假記錄」補上傳，但補件前主管無法核准。\n\n確定先送出嗎？')) return;
+  }
 
   const isHourMode = document.getElementById('leave-unit-hour')?.checked;
   let payload;
@@ -1967,6 +2003,11 @@ function renderMyLeaveList() {
         ${r.substitute_name ? `　代理人：${esc(r.substitute_name)}` : ''}
         ${r.document_id ? `<a href="/api/documents/${r.document_id}/image" target="_blank" style="margin-left:8px;color:var(--accent);font-size:11px;text-decoration:none">查看病單</a>` : ''}
         ${r.review_note ? `<div style="color:${sc};margin-top:4px">審核意見：${esc(r.review_note)}</div>` : ''}
+        ${r.require_cert && !r.document_id && r.status !== 'approved' ? `
+        <div style="margin-top:6px;padding:8px 10px;background:#fff7ed;border:1px solid var(--orange);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <span style="font-size:11px;font-weight:700;color:var(--orange)">⚠ 尚未上傳病單/證明，補件前主管無法核准</span>
+          <button class="btn btn-outline btn-sm" style="white-space:nowrap" onclick="lateCertPick(${r.id})">補上傳</button>
+        </div>` : ''}
       </div>
     </div>`;
   }).join('');

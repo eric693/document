@@ -107,6 +107,7 @@ def init_finance_db():
             UNIQUE(year, month, category_id)
         )""",
         "ALTER TABLE salary_records ADD COLUMN IF NOT EXISTS finance_synced BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE finance_documents ADD COLUMN IF NOT EXISTS uploaded_by_staff INT",
     ]
     for sql in migrations:
         try:

@@ -491,7 +491,7 @@ def api_leave_my_list():
     with get_db() as conn:
         rows = conn.execute("""
             SELECT lr.*, lt.name as leave_type_name, lt.code as leave_code,
-                   lt.color as leave_color, lt.pay_rate
+                   lt.color as leave_color, lt.pay_rate, lt.require_cert
             FROM leave_requests lr
             JOIN leave_types lt ON lt.id=lr.leave_type_id
             WHERE lr.staff_id=%s ORDER BY lr.start_date DESC LIMIT 30
@@ -503,6 +503,7 @@ def api_leave_my_list():
         d['leave_code']      = r['leave_code']
         d['leave_color']     = r['leave_color']
         d['pay_rate']        = float(r['pay_rate'])
+        d['require_cert']    = bool(r['require_cert'])
         result.append(d)
     return jsonify(result)
 
@@ -541,6 +542,8 @@ def api_leave_submit():
             return jsonify({'error': '請假天數不合理，請檢查日期'}), 400
 
     with get_db() as conn:
+        if document_id and not _cert_owned_by_staff(conn, document_id, sid):
+            return jsonify({'error': '附件無效，請重新上傳病單/證明'}), 400
         lt = conn.execute("SELECT * FROM leave_types WHERE id=%s", (leave_type_id,)).fetchone()
         if lt and lt['max_days'] is not None:
             year = start_date[:4]
@@ -568,6 +571,39 @@ def api_leave_submit():
         """, (sid, leave_type_id, start_date, end_date, start_half, end_half,
               total_days, total_hours_req, reason, substitute, document_id)).fetchone()
     return jsonify(leave_req_row(row)), 201
+
+
+def _cert_owned_by_staff(conn, document_id, sid):
+    # 僅允許掛上自己上傳的病單，避免靠猜 ID 取得他人附件的檢視權
+    doc = conn.execute("""
+        SELECT 1 FROM finance_documents
+        WHERE id=%s AND doc_type='medical_cert' AND uploaded_by_staff=%s
+    """, (document_id, sid)).fetchone()
+    return bool(doc)
+
+
+@bp.route('/api/leave/my-requests/<int:rid>/document', methods=['PUT'])
+def api_leave_my_attach_document(rid):
+    sid = session.get('punch_staff_id')
+    if not sid: return jsonify({'error': 'not logged in'}), 401
+    b = request.get_json(force=True)
+    document_id = b.get('document_id')
+    if not document_id:
+        return jsonify({'error': '缺少 document_id'}), 400
+    with get_db() as conn:
+        req = conn.execute("SELECT * FROM leave_requests WHERE id=%s AND staff_id=%s",
+                           (rid, sid)).fetchone()
+        if not req:
+            return jsonify({'error': '找不到假單'}), 404
+        if req['status'] == 'approved':
+            return jsonify({'error': '假單已核准，如需更換附件請聯絡管理員'}), 422
+        if not _cert_owned_by_staff(conn, document_id, sid):
+            return jsonify({'error': '附件無效，請重新上傳病單/證明'}), 400
+        row = conn.execute("""
+            UPDATE leave_requests SET document_id=%s, updated_at=NOW()
+            WHERE id=%s RETURNING *
+        """, (document_id, rid)).fetchone()
+    return jsonify(leave_req_row(row))
 
 
 # ─── Leave Balance ───────────────────────────────────────────────────────────
@@ -729,9 +765,9 @@ def api_leave_upload_cert():
     try:
         with get_db() as conn:
             doc = conn.execute("""
-                INSERT INTO finance_documents (filename, doc_type, image_data, upload_date)
-                VALUES (%s, 'medical_cert', %s, CURRENT_DATE) RETURNING id
-            """, (file.filename, image_data)).fetchone()
+                INSERT INTO finance_documents (filename, doc_type, image_data, upload_date, uploaded_by_staff)
+                VALUES (%s, 'medical_cert', %s, CURRENT_DATE, %s) RETURNING id
+            """, (file.filename, image_data, session.get('punch_staff_id'))).fetchone()
         return jsonify({'document_id': doc['id'], 'filename': file.filename})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
