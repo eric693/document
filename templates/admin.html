@@ -700,7 +700,11 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="punch-panel-anomaly" style="display:none">
       <div class="filter-bar" style="margin-bottom:16px;gap:12px;flex-wrap:wrap">
         <span style="font-size:13px;color:var(--muted)">自動偵測近 7 天出勤異常（遲到、早退、缺打卡、今日未出勤）</span>
-        <button class="btn btn-primary btn-sm" onclick="batchFixAnomalies()" id="anomaly-batchfix-btn" disabled>批次補登（依排班）</button>
+        <span class="filter-label" title="批次補登時，當日無排班的員工以此時間補登">固定上下班</span>
+        <input type="time" id="fixed-work-start" class="filter-input" style="width:105px" onchange="saveWorkTimeConfig()">
+        <span style="color:var(--muted)">–</span>
+        <input type="time" id="fixed-work-end" class="filter-input" style="width:105px" onchange="saveWorkTimeConfig()">
+        <button class="btn btn-primary btn-sm" onclick="batchFixAnomalies()" id="anomaly-batchfix-btn" disabled>批次補登</button>
         <span style="flex:1"></span>
         <span class="filter-label">月份</span>
         <input class="filter-input" type="month" id="anomaly-export-month" style="width:140px">
@@ -4022,7 +4026,24 @@ let _mstatsData = [];
 
 let _anomalyData = [];
 
+async function loadWorkTimeConfig() {
+  const { ok, data } = await api('/api/punch/settings', {}, true);
+  if (!ok) return;
+  document.getElementById('fixed-work-start').value = data.work_start_time || '08:00';
+  document.getElementById('fixed-work-end').value   = data.work_end_time   || '17:00';
+}
+
+async function saveWorkTimeConfig() {
+  const ws = document.getElementById('fixed-work-start').value;
+  const we = document.getElementById('fixed-work-end').value;
+  if (!ws || !we) return;
+  const { ok, data } = await api('/api/punch/config', apiPUT({ work_start_time: ws, work_end_time: we }));
+  if (!ok) { showToast((data && data.error) || '儲存失敗', true); return; }
+  showToast(`固定上下班時間已更新：${ws}–${we}`, 'success');
+}
+
 async function loadPunchAnomalies() {
+  loadWorkTimeConfig();
   const tb = document.getElementById('anomaly-tbody');
   tb.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="empty-state-text">載入中...</div></td></tr>';
   const { ok, data } = await api('/api/attendance/anomalies', {}, true);
@@ -4067,7 +4088,7 @@ function toggleAllAnomalies(checked) {
 function updateBatchFixBtn() {
   const n = document.querySelectorAll('.anomaly-cb:checked').length;
   const btn = document.getElementById('anomaly-batchfix-btn');
-  if (btn) { btn.disabled = n === 0; btn.textContent = n ? `批次補登（依排班）${n} 筆` : '批次補登（依排班）'; }
+  if (btn) { btn.disabled = n === 0; btn.textContent = n ? `批次補登 ${n} 筆` : '批次補登'; }
 }
 
 async function batchFixAnomalies() {
@@ -4076,7 +4097,9 @@ async function batchFixAnomalies() {
     .filter(Boolean)
     .map(a => ({ staff_id: a.staff_id, date: a.date, type: a.type, name: a.name }));
   if (!items.length) { showToast('請先勾選要補登的項目', true); return; }
-  if (!confirm(`將依「當日排班的應上/下班時間」補登 ${items.length} 筆打卡，確定執行？\n（當日無排班者會自動跳過，需手動補登）`)) return;
+  const ws = document.getElementById('fixed-work-start').value || '08:00';
+  const we = document.getElementById('fixed-work-end').value   || '17:00';
+  if (!confirm(`將補登 ${items.length} 筆打卡，確定執行？\n有排班者依排班時間；無排班者依固定上下班時間（${ws}–${we}）補登。`)) return;
   const { ok, data } = await api('/api/attendance/batch-fix', apiJSON({ items }));
   if (!ok) { showToast((data && data.error) || '批次補登失敗', true); return; }
   let msg = `已補登 ${data.fixed} 筆`;

@@ -225,6 +225,9 @@ def init_db():
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS bank_account TEXT DEFAULT ''",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS account_holder TEXT DEFAULT ''",
         "ALTER TABLE shift_types ADD COLUMN IF NOT EXISTS departments TEXT DEFAULT ''",
+        # punch_config — 固定上下班時間（無排班公司用，批次補登等功能的依據）
+        "ALTER TABLE punch_config ADD COLUMN IF NOT EXISTS work_start_time TEXT DEFAULT '08:00'",
+        "ALTER TABLE punch_config ADD COLUMN IF NOT EXISTS work_end_time TEXT DEFAULT '17:00'",
         # punch_records
         "ALTER TABLE punch_records ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION",
         "ALTER TABLE punch_records ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION",

@@ -185,6 +185,8 @@ def api_punch_settings_get():
         ).fetchall()
     return jsonify({
         'gps_required': cfg['gps_required'] if cfg else False,
+        'work_start_time': (cfg['work_start_time'] if cfg else None) or '08:00',
+        'work_end_time':   (cfg['work_end_time']   if cfg else None) or '17:00',
         'locations': [loc_row(r) for r in locs]
     })
 
@@ -192,14 +194,27 @@ def api_punch_settings_get():
 @bp.route('/api/punch/config', methods=['PUT'])
 @login_required
 def api_punch_config_update():
+    import re as _re
     b = request.get_json(force=True)
-    gps_required = bool(b.get('gps_required', False))
+    sets, params = [], []
+    if 'gps_required' in b:
+        sets.append("gps_required=%s"); params.append(bool(b['gps_required']))
+    for key in ('work_start_time', 'work_end_time'):
+        if key in b:
+            val = str(b[key] or '').strip()
+            if not _re.fullmatch(r'([01]\d|2[0-3]):[0-5]\d', val):
+                return jsonify({'error': '時間格式須為 HH:MM'}), 400
+            sets.append(f"{key}=%s"); params.append(val)
+    if not sets:
+        return jsonify({'error': '沒有可更新的欄位'}), 400
     with get_db() as conn:
-        conn.execute(
-            "UPDATE punch_config SET gps_required=%s, updated_at=NOW() WHERE id=1",
-            (gps_required,)
-        )
-    return jsonify({'gps_required': gps_required})
+        row = conn.execute(
+            f"UPDATE punch_config SET {', '.join(sets)}, updated_at=NOW() WHERE id=1 RETURNING *",
+            params
+        ).fetchone()
+    return jsonify({'gps_required': row['gps_required'],
+                    'work_start_time': row['work_start_time'],
+                    'work_end_time': row['work_end_time']})
 
 
 @bp.route('/api/punch/locations', methods=['GET'])

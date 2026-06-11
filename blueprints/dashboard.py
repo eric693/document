@@ -552,7 +552,8 @@ def api_attendance_anomalies():
 @bp.route('/api/attendance/batch-fix', methods=['POST'])
 @login_required
 def api_attendance_batch_fix():
-    """批次補登忘記上/下班打卡——依當日排班的應上/下班時間補上缺漏的打卡。"""
+    """批次補登忘記上/下班打卡——依當日排班的應上/下班時間補上缺漏的打卡；
+    無排班時改用打卡設定中的固定上下班時間（適用不排班、固定工時的公司）。"""
     from flask import session
     b     = request.get_json(force=True) or {}
     items = b.get('items') or []
@@ -561,6 +562,11 @@ def api_attendance_batch_fix():
     manual_by = session.get('admin_display_name', '管理員')
     fixed, skipped = [], []
     with get_db() as conn:
+        cfg = conn.execute(
+            "SELECT work_start_time, work_end_time FROM punch_config WHERE id=1"
+        ).fetchone()
+        fixed_start = (cfg and cfg.get('work_start_time')) or '08:00'
+        fixed_end   = (cfg and cfg.get('work_end_time'))   or '17:00'
         for it in items:
             staff_id = it.get('staff_id')
             ds       = str(it.get('date') or '')
@@ -574,11 +580,14 @@ def api_attendance_batch_fix():
                 WHERE sa.staff_id=%s AND sa.shift_date=%s
                 LIMIT 1
             """, (staff_id, ds)).fetchone()
-            if not shift:
-                skipped.append({**it, 'reason': '當日無排班，請手動補登'}); continue
-            t = shift['start_time'] if punch_type == 'in' else shift['end_time']
-            if not t:
-                skipped.append({**it, 'reason': '排班未設定上/下班時間'}); continue
+            if shift:
+                t = shift['start_time'] if punch_type == 'in' else shift['end_time']
+                basis = '依排班'
+                if not t:
+                    skipped.append({**it, 'reason': '排班未設定上/下班時間'}); continue
+            else:
+                t = fixed_start if punch_type == 'in' else fixed_end
+                basis = '依固定上下班時間'
             exists = conn.execute("""
                 SELECT 1 FROM punch_records
                 WHERE staff_id=%s AND punch_type=%s
@@ -598,7 +607,7 @@ def api_attendance_batch_fix():
                 INSERT INTO punch_records
                   (staff_id, punch_type, punched_at, note, is_manual, manual_by)
                 VALUES (%s,%s,%s,%s,TRUE,%s)
-            """, (staff_id, punch_type, punched_at, f'批次補登（依排班 {ts}）', manual_by))
+            """, (staff_id, punch_type, punched_at, f'批次補登（{basis} {ts}）', manual_by))
             fixed.append({**it, 'time': ts})
     return jsonify({'fixed': len(fixed), 'skipped': len(skipped),
                     'fixed_items': fixed, 'skipped_items': skipped})
