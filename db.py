@@ -296,7 +296,7 @@ def init_db():
         # leave_requests
         "ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS leave_start_time TEXT",
         "ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS leave_end_time TEXT",
-        "ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS total_days NUMERIC(5,2) DEFAULT 0",
+        "ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS total_days NUMERIC(7,4) DEFAULT 0",
         "ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS document_id INT",
         "ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS force_reviewed BOOLEAN DEFAULT FALSE",
         # salary_records
