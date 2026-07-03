@@ -70,11 +70,26 @@ def api_ot_submit():
     start_time   = b.get('start_time', '').strip()
     end_time     = b.get('end_time', '').strip()
     reason       = b.get('reason', '').strip()
-    day_type     = b.get('day_type', 'weekday').strip()
-    if day_type not in ('weekday', 'rest_day', 'holiday', 'special'):
-        day_type = 'weekday'
     if not request_date or not start_time or not end_time:
         return jsonify({'error': '請填寫加班日期及時間'}), 400
+    # 日期類型由後端依日期判定，不信任前端值（避免平日被改成假日拿雙倍費率）
+    from datetime import date as _dot
+    try:
+        _req_d = _dot.fromisoformat(request_date)
+    except ValueError:
+        return jsonify({'error': '日期格式錯誤'}), 400
+    with get_db() as conn:
+        _is_holiday = conn.execute(
+            "SELECT 1 FROM public_holidays WHERE date=%s", (request_date,)
+        ).fetchone()
+    if _is_holiday:
+        day_type = 'holiday'
+    elif _req_d.weekday() == 6:
+        day_type = 'special'      # 週日＝例假日
+    elif _req_d.weekday() == 5:
+        day_type = 'rest_day'     # 週六＝休息日
+    else:
+        day_type = 'weekday'
     if not reason:
         return jsonify({'error': '請填寫加班原因'}), 400
     from datetime import datetime as _dtot, timedelta as _tdot

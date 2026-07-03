@@ -222,17 +222,26 @@ def _calc_annual_leave_schedule(hire_date_str):
 
 
 def _calc_leave_days(start_date_str, end_date_str, start_half=False, end_half=False):
-    from datetime import date as _date, timedelta as _tdd
+    """只計工作日（週一～五、排除國定假日），與薪資計算的工作日定義一致"""
+    from datetime import date as _date, timedelta as _td
     try:
         s = _date.fromisoformat(start_date_str)
         e = _date.fromisoformat(end_date_str)
     except Exception:
         return 0.0
     if e < s: return 0.0
+    holidays = set()
+    try:
+        with get_db() as conn:
+            holidays = {str(r['date']) for r in conn.execute(
+                "SELECT date FROM public_holidays WHERE date BETWEEN %s AND %s", (s, e)
+            ).fetchall()}
+    except Exception:
+        pass
     days = 0.0
     cur  = s
     while cur <= e:
-        if cur.weekday() != 6:
+        if cur.weekday() < 5 and cur.isoformat() not in holidays:
             if cur == s and start_half and cur == e and end_half:
                 days += 1.0
             elif cur == s and start_half:
@@ -241,7 +250,6 @@ def _calc_leave_days(start_date_str, end_date_str, start_half=False, end_half=Fa
                 days += 0.5
             else:
                 days += 1.0
-        from datetime import timedelta as _td
         cur += _td(days=1)
     return days
 

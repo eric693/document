@@ -928,13 +928,26 @@ def _line_submit_overtime(staff, user_id, text):
         _send_line_punch(user_id, '時間計算錯誤，請重新選擇。')
         return
 
+    # 日期類型與網頁申請同規則，由日期判定（假日加班才拿得到假日費率）
+    _req_d = _dot.fromisoformat(date_str)
     with get_db() as conn:
+        _is_holiday = conn.execute(
+            "SELECT 1 FROM public_holidays WHERE date=%s", (date_str,)
+        ).fetchone()
+        if _is_holiday:
+            day_type = 'holiday'
+        elif _req_d.weekday() == 6:
+            day_type = 'special'
+        elif _req_d.weekday() == 5:
+            day_type = 'rest_day'
+        else:
+            day_type = 'weekday'
         row = conn.execute("""
             INSERT INTO overtime_requests
-              (staff_id, request_date, start_time, end_time, ot_hours, reason, status)
-            VALUES (%s, %s, %s, %s, %s, %s, 'pending')
+              (staff_id, request_date, start_time, end_time, ot_hours, reason, status, day_type)
+            VALUES (%s, %s, %s, %s, %s, %s, 'pending', %s)
             RETURNING id
-        """, (staff['id'], date_str, start_str, end_str, round(hours, 2), '（LINE 加班申請）')).fetchone()
+        """, (staff['id'], date_str, start_str, end_str, round(hours, 2), '（LINE 加班申請）', day_type)).fetchone()
 
     _send_line_punch(user_id,
         f'✅ 加班申請已送出\n\n'

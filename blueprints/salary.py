@@ -7,6 +7,7 @@ import logging
 from flask import Blueprint, session, request, jsonify
 
 from auth import require_module
+from config import TW_TZ
 from db import get_db
 from blueprints.punch import punch_staff_row
 from blueprints.leave import _calc_annual_leave_days
@@ -197,10 +198,10 @@ def _eval_formula(formula, base_salary, insured_salary, service_years, extra=Non
 
 def _calc_service_years(hire_date_str):
     if not hire_date_str: return 0.0
-    from datetime import date as _d4
+    from datetime import date as _d4, datetime as _dt4
     try:
         hire = _d4.fromisoformat(str(hire_date_str))
-        return round((_d4.today() - hire).days / 365.25, 2)
+        return round((_dt4.now(TW_TZ).date() - hire).days / 365.25, 2)
     except Exception:
         return 0.0
 
@@ -522,6 +523,8 @@ def _auto_generate_salary(conn, staff, month, work_days=None):
         allowance_total += hourly_base_pay
 
         if ot_pay == 0 and actual_work_hours > 0:
+            # 本薪已按 1 倍支付全部打卡工時，這裡只補加班的「加成」差額
+            # （rate-1），否則加班時段會領到 1 + 1.33 = 2.33 倍
             rate1 = float(staff.get('ot_rate1') or 1.33)
             rate2 = float(staff.get('ot_rate2') or 1.67)
             rate3 = float(staff.get('ot_rate3') or 2.0)
@@ -531,7 +534,7 @@ def _auto_generate_salary(conn, staff, month, work_days=None):
                     h1 = min(overtime_h, 2.0)
                     h2 = min(max(0.0, overtime_h - 2.0), 2.0)
                     h3 = max(0.0, overtime_h - 4.0)
-                    ot_pay += _round_money(hourly_rate * (h1 * rate1 + h2 * rate2 + h3 * rate3))
+                    ot_pay += _round_money(hourly_rate * (h1 * (rate1 - 1) + h2 * (rate2 - 1) + h3 * (rate3 - 1)))
 
         if insured_salary == 0:
             insured_salary = round(hourly_rate * daily_hours * 30, 0)
@@ -613,7 +616,9 @@ def _auto_generate_salary(conn, staff, month, work_days=None):
         })
         allowance_total += ot_pay
 
-    if _sal_cfg['auto_leave_deduction']:
+    # 時薪制以實際打卡工時計薪，未出勤時段本來就沒領錢，
+    # 再扣請假款會變成雙重處罰，故自動請假扣款僅適用月薪制
+    if _sal_cfg['auto_leave_deduction'] and salary_type == 'monthly':
         if unpaid_days > 0 and daily_wage > 0:
             leave_names = '、'.join(set(
                 r['leave_name'] for r in leave_rows
@@ -641,28 +646,31 @@ def _auto_generate_salary(conn, staff, month, work_days=None):
             deduction_total += deduct
 
         if half_pay_days > 0 and daily_wage > 0:
-            leave_names = '、'.join(set(
-                r['leave_name'] for r in leave_rows
-                if 0.001 <= float(r['pay_rate']) <= 0.999 and not r['is_hourly']
+            # 依各假別實際 pay_rate 扣（1 - pay_rate），而非一律砍半
+            _partial = [r for r in leave_rows
+                        if 0.001 <= float(r['pay_rate']) <= 0.999 and not r['is_hourly']]
+            leave_names = '、'.join(set(r['leave_name'] for r in _partial))
+            deduct = _round_money(sum(
+                daily_wage * r['days_in_month'] * (1 - float(r['pay_rate'])) for r in _partial
             ))
-            deduct = _round_money(daily_wage * half_pay_days * 0.5)
             items.append({
-                'id': 'halfpay', 'name': f'半薪假扣款（{leave_names}）', 'type': 'deduction',
+                'id': 'halfpay', 'name': f'部分給薪假扣款（{leave_names}）', 'type': 'deduction',
                 'amount': deduct, 'formula': '',
-                'calc_note': f'{half_pay_days}天 × 日薪${round(daily_wage, 0)} × 0.5',
+                'calc_note': f'{half_pay_days}天 × 日薪${round(daily_wage, 0)} × (1-給薪比率)',
             })
             deduction_total += deduct
 
         if _hourly_halfpay_hours > 0 and hourly_wage > 0:
-            leave_names = '、'.join(set(
-                r['leave_name'] for r in leave_rows
-                if 0.001 <= float(r['pay_rate']) <= 0.999 and r['is_hourly']
+            _partial_h = [r for r in leave_rows
+                          if 0.001 <= float(r['pay_rate']) <= 0.999 and r['is_hourly']]
+            leave_names = '、'.join(set(r['leave_name'] for r in _partial_h))
+            deduct = _round_money(sum(
+                hourly_wage * r['hours'] * (1 - float(r['pay_rate'])) for r in _partial_h
             ))
-            deduct = _round_money(hourly_wage * _hourly_halfpay_hours * 0.5)
             items.append({
-                'id': 'halfpay_hourly', 'name': f'半薪假扣款-小時（{leave_names}）', 'type': 'deduction',
+                'id': 'halfpay_hourly', 'name': f'部分給薪假扣款-小時（{leave_names}）', 'type': 'deduction',
                 'amount': deduct, 'formula': '',
-                'calc_note': f'{_hourly_halfpay_hours}h × 時薪${round(hourly_wage, 1)} × 0.5',
+                'calc_note': f'{_hourly_halfpay_hours}h × 時薪${round(hourly_wage, 1)} × (1-給薪比率)',
             })
             deduction_total += deduct
 
