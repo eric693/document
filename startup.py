@@ -1,31 +1,16 @@
 """
-startup.py — 背景執行緒：keep_alive、年假同步
+startup.py — 背景執行緒：年假同步
 """
 import threading
 import time
-import urllib.request
 from datetime import datetime, timedelta
 
-from config import RENDER_EXTERNAL_URL, TW_TZ
-
-
-def keep_alive():
-    """每 14 分鐘 ping 自身，避免 Render free tier 休眠"""
-    url = RENDER_EXTERNAL_URL + '/health' if RENDER_EXTERNAL_URL else None
-    if not url:
-        return
-    while True:
-        try:
-            urllib.request.urlopen(url, timeout=10)
-        except Exception:
-            pass
-        time.sleep(14 * 60)
+from config import TW_TZ
 
 
 def _run_annual_leave_sync():
     """依勞基法第38條，依到職日計算特休天數，寫入 leave_balances。每日午夜自動執行。"""
-    from datetime import date as _date
-    year = _date.today().year
+    year = datetime.now(TW_TZ).year
     try:
         from blueprints.leave import _calc_annual_leave_days
         from db import get_db
@@ -69,8 +54,5 @@ def _annual_leave_sync_loop():
 
 def start_background_threads():
     """啟動所有背景執行緒"""
-    t1 = threading.Thread(target=keep_alive, daemon=True)
-    t1.start()
-
-    t2 = threading.Thread(target=_annual_leave_sync_loop, daemon=True)
-    t2.start()
+    t = threading.Thread(target=_annual_leave_sync_loop, daemon=True)
+    t.start()

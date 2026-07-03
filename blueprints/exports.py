@@ -5,8 +5,12 @@ import io
 from datetime import datetime as _dt, date as _date
 from flask import Blueprint, request, jsonify, Response
 
-from auth import login_required, require_module
+from auth import login_required, require_module, require_any_module
 from config import TW_TZ
+
+
+def _tw_today():
+    return _dt.now(TW_TZ).date()
 from db import get_db
 
 bp = Blueprint('exports', __name__)
@@ -180,7 +184,7 @@ def _get_edi_staff(staff_ids_str):
 # ── Attendance Export ──────────────────────────────────────────────
 
 @bp.route('/api/export/attendance', methods=['GET'])
-@login_required
+@require_module('punch')
 def api_export_attendance():
     month    = request.args.get('month', '') or _dt.now(TW_TZ).strftime('%Y-%m')
     staff_id = request.args.get('staff_id', '')
@@ -214,7 +218,7 @@ def api_export_attendance():
 
 
 @bp.route('/api/export/attendance-summary', methods=['GET'])
-@login_required
+@require_module('punch')
 def api_export_attendance_summary():
     month = request.args.get('month', '') or _dt.now(TW_TZ).strftime('%Y-%m')
     with get_db() as conn:
@@ -254,7 +258,7 @@ def api_export_attendance_summary():
 
 
 @bp.route('/api/attendance/anomaly-report', methods=['GET'])
-@login_required
+@require_module('punch')
 def api_anomaly_report_excel():
     import openpyxl, calendar as _cal
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
@@ -291,6 +295,11 @@ def api_anomaly_report_excel():
             SELECT staff_id, start_date, end_date FROM leave_requests
             WHERE status='approved' AND start_date <= %s AND end_date >= %s
         """, (last_day, first_day)).fetchall()
+        _cfg = conn.execute(
+            "SELECT work_start_time, work_end_time FROM punch_config WHERE id=1"
+        ).fetchone()
+    fixed_start = (_cfg and _cfg.get('work_start_time')) or '08:00'
+    fixed_end   = (_cfg and _cfg.get('work_end_time'))   or '17:00'
 
     shift_map = {(r['staff_id'], str(r['shift_date'])): r for r in shift_rows}
     leave_set = set()
@@ -303,7 +312,7 @@ def api_anomaly_report_excel():
             leave_set.add((lr['staff_id'], str(cur)))
             cur += _td(days=1)
 
-    today = _date.today()
+    today = _tw_today()
     anomalies = []
     for r in punch_rows:
         ds = str(r['work_date']); sid = r['staff_id']
@@ -314,15 +323,18 @@ def api_anomaly_report_excel():
         elif r['has_in'] and not r['has_out']:
             if _date.fromisoformat(ds) < today:
                 anomaly_type = '缺下班打卡'; detail = f"上班 {str(r['clock_in'])[11:16]} 無下班"
-        elif r['has_in'] and r['has_out'] and shift:
-            ci_t = str(r['clock_in'])[11:16]; sh_s = str(shift['start_time'])[:5]
+        elif r['has_in'] and r['has_out']:
+            # 無排班（固定工時公司）改用打卡設定的固定上下班時間
+            sh_s = str(shift['start_time'])[:5] if (shift and shift['start_time']) else fixed_start
+            sh_e = str(shift['end_time'])[:5]   if (shift and shift['end_time'])   else fixed_end
+            ci_t = str(r['clock_in'])[11:16]
             try:
                 late_mins = (int(ci_t[:2])*60 + int(ci_t[3:5])) - (int(sh_s[:2])*60 + int(sh_s[3:5]))
                 if late_mins > 10:
                     anomaly_type = '遲到'; detail = f"應 {sh_s}，實際 {ci_t}（+{late_mins}分）"
             except Exception: pass
             if not anomaly_type:
-                co_t = str(r['clock_out'])[11:16]; sh_e = str(shift['end_time'])[:5]
+                co_t = str(r['clock_out'])[11:16]
                 try:
                     early_mins = (int(sh_e[:2])*60 + int(sh_e[3:5])) - (int(co_t[:2])*60 + int(co_t[3:5]))
                     if early_mins > 15:
@@ -331,8 +343,8 @@ def api_anomaly_report_excel():
         if anomaly_type:
             anomalies.append({
                 'staff_name': r['staff_name'], 'department': r['department'] or '', 'date': ds,
-                'shift_start': str(shift['start_time'])[:5] if shift else '—',
-                'shift_end':   str(shift['end_time'])[:5]   if shift else '—',
+                'shift_start': str(shift['start_time'])[:5] if shift else fixed_start,
+                'shift_end':   str(shift['end_time'])[:5]   if shift else fixed_end,
                 'clock_in':    str(r['clock_in'])[11:16]  if r['clock_in']  else '—',
                 'clock_out':   str(r['clock_out'])[11:16] if r['clock_out'] else '—',
                 'anomaly_type': anomaly_type, 'detail': detail,
@@ -386,7 +398,7 @@ def api_anomaly_report_excel():
 # ── Salary Export ──────────────────────────────────────────────────
 
 @bp.route('/api/export/salary', methods=['GET'])
-@login_required
+@require_module('salary')
 def api_export_salary():
     month = request.args.get('month', '') or _dt.now(TW_TZ).strftime('%Y-%m')
     with get_db() as conn:
@@ -427,7 +439,7 @@ def api_export_salary():
 # ── Leave Export ───────────────────────────────────────────────────
 
 @bp.route('/api/export/leave', methods=['GET'])
-@login_required
+@require_module('leave')
 def api_export_leave():
     month = request.args.get('month', ''); year = request.args.get('year', '')
     staff_id = request.args.get('staff_id', ''); status = request.args.get('status', '')
@@ -463,7 +475,7 @@ def api_export_leave():
 # ── Overtime Export ────────────────────────────────────────────────
 
 @bp.route('/api/export/overtime', methods=['GET'])
-@login_required
+@require_any_module('punch', 'salary')
 def api_export_overtime():
     month = request.args.get('month', ''); staff_id = request.args.get('staff_id', '')
     status = request.args.get('status', '')
@@ -496,7 +508,7 @@ def api_export_overtime():
 # ── Staff Export ───────────────────────────────────────────────────
 
 @bp.route('/api/export/staff', methods=['GET'])
-@login_required
+@require_module('punch')
 def api_export_staff():
     dept = request.args.get('department', ''); active = request.args.get('active', '1')
     conds, params = ['TRUE'], []
@@ -531,7 +543,7 @@ def api_export_staff():
 # ── Expense Export ─────────────────────────────────────────────────
 
 @bp.route('/api/export/expense', methods=['GET'])
-@login_required
+@require_module('expense-review')
 def api_export_expense():
     month = request.args.get('month', ''); staff_id = request.args.get('staff_id', '')
     status = request.args.get('status', '')
@@ -564,7 +576,7 @@ def api_export_expense():
 # ── Leave Balance Export ───────────────────────────────────────────
 
 @bp.route('/api/export/leave-balance', methods=['GET'])
-@login_required
+@require_module('leave')
 def api_export_leave_balance():
     year = request.args.get('year', '') or str(_dt.now(TW_TZ).year)
     with get_db() as conn:
@@ -597,7 +609,7 @@ def api_export_leave_balance():
 @require_module('salary')
 def api_export_withholding():
     from blueprints.finance import _get_finance_settings
-    year = request.args.get('year', str(_date.today().year))
+    year = request.args.get('year', str(_tw_today().year))
     fmt  = request.args.get('format', 'html')
     fs   = _get_finance_settings()
     company_name    = fs.get('company_name', '')
@@ -667,7 +679,7 @@ tr:nth-child(even){{background:#f8f9fb}}
 @media print{{button{{display:none}}}}</style></head><body>
 <button onclick="window.print()" style="margin-bottom:16px;padding:6px 16px;background:#0f1c3a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">列印</button>
 <h2>{year} 年度薪資所得扣繳憑單（所得類別 50）</h2>
-<div class="meta">扣繳義務人：{company_name}　統一編號：{company_tax_id}　地址：{company_address}　製表日期：{_date.today().isoformat()}</div>
+<div class="meta">扣繳義務人：{company_name}　統一編號：{company_tax_id}　地址：{company_address}　製表日期：{_tw_today().isoformat()}</div>
 <table><thead><tr><th>#</th><th>員工姓名</th><th>身分證字號</th><th>地址</th>
 <th>年度薪資合計(元)</th><th>二代健保補充費(元)</th><th>扣繳稅額(元)</th></tr></thead>
 <tbody>{rows_html}</tbody></table></body></html>"""
@@ -677,7 +689,7 @@ tr:nth-child(even){{background:#f8f9fb}}
 # ── PDF Exports ────────────────────────────────────────────────────
 
 @bp.route('/api/export/attendance/pdf', methods=['GET'])
-@login_required
+@require_module('punch')
 def api_export_attendance_pdf():
     month    = request.args.get('month', '') or _dt.now(TW_TZ).strftime('%Y-%m')
     staff_id = request.args.get('staff_id', '')
@@ -701,13 +713,13 @@ def api_export_attendance_pdf():
              str(r['work_date']), PUNCH_LABEL.get(r['punch_type'], r['punch_type']),
              r['punch_time'], '是' if r['is_manual'] else '', r['location_name'] or '']
             for r in rows]
-    buf = _build_pdf(f'{month} 出勤打卡明細', f'製表：{_date.today().isoformat()}  共 {len(data)} 筆',
+    buf = _build_pdf(f'{month} 出勤打卡明細', f'製表：{_tw_today().isoformat()}  共 {len(data)} 筆',
                      headers, col_widths, data, landscape=True)
     return _pdf_response(buf, f'attendance_{month}.pdf')
 
 
 @bp.route('/api/export/attendance-summary/pdf', methods=['GET'])
-@login_required
+@require_module('punch')
 def api_export_attendance_summary_pdf():
     month = request.args.get('month', '') or _dt.now(TW_TZ).strftime('%Y-%m')
     with get_db() as conn:
@@ -740,13 +752,13 @@ def api_export_attendance_summary_pdf():
         data.append([r['employee_code'] or '', r['name'], r['department'] or '',
                      str(r['work_date']), r['clock_in'] or '', r['clock_out'] or '',
                      dur_h, str(r['punch_count']), '是' if r['has_manual'] else ''])
-    buf = _build_pdf(f'{month} 出勤摘要', f'製表：{_date.today().isoformat()}  共 {len(data)} 筆',
+    buf = _build_pdf(f'{month} 出勤摘要', f'製表：{_tw_today().isoformat()}  共 {len(data)} 筆',
                      headers, col_widths, data, landscape=True)
     return _pdf_response(buf, f'attendance_summary_{month}.pdf')
 
 
 @bp.route('/api/attendance/anomaly-report/pdf', methods=['GET'])
-@login_required
+@require_module('punch')
 def api_anomaly_report_pdf():
     import calendar as _cal
     month = request.args.get('month', '') or _dt.now(TW_TZ).strftime('%Y-%m')
@@ -780,6 +792,11 @@ def api_anomaly_report_pdf():
             SELECT staff_id, start_date, end_date FROM leave_requests
             WHERE status='approved' AND start_date <= %s AND end_date >= %s
         """, (last_day, first_day)).fetchall()
+        _cfg = conn.execute(
+            "SELECT work_start_time, work_end_time FROM punch_config WHERE id=1"
+        ).fetchone()
+    fixed_start = (_cfg and _cfg.get('work_start_time')) or '08:00'
+    fixed_end   = (_cfg and _cfg.get('work_end_time'))   or '17:00'
     from datetime import timedelta as _td
     shift_map = {(r['staff_id'], str(r['shift_date'])): r for r in shift_rows}
     leave_set = set()
@@ -788,7 +805,7 @@ def api_anomaly_report_pdf():
         e   = _date.fromisoformat(str(lr['end_date']))
         while cur <= e:
             leave_set.add((lr['staff_id'], str(cur))); cur += _td(days=1)
-    today = _date.today()
+    today = _tw_today()
     anomalies = []
     for r in punch_rows:
         ds = str(r['work_date']); sid = r['staff_id']
@@ -799,15 +816,18 @@ def api_anomaly_report_pdf():
         elif r['has_in'] and not r['has_out']:
             if _date.fromisoformat(ds) < today:
                 anomaly_type = '缺下班打卡'; detail = f"上班 {str(r['clock_in'])[11:16]} 無下班"
-        elif r['has_in'] and r['has_out'] and shift:
-            ci_t = str(r['clock_in'])[11:16]; sh_s = str(shift['start_time'])[:5]
+        elif r['has_in'] and r['has_out']:
+            # 無排班（固定工時公司）改用打卡設定的固定上下班時間
+            sh_s = str(shift['start_time'])[:5] if (shift and shift['start_time']) else fixed_start
+            sh_e = str(shift['end_time'])[:5]   if (shift and shift['end_time'])   else fixed_end
+            ci_t = str(r['clock_in'])[11:16]
             try:
                 late_mins = (int(ci_t[:2])*60+int(ci_t[3:5])) - (int(sh_s[:2])*60+int(sh_s[3:5]))
                 if late_mins > 10:
                     anomaly_type = '遲到'; detail = f"應{sh_s}，實{ci_t}(+{late_mins}分)"
             except Exception: pass
             if not anomaly_type:
-                co_t = str(r['clock_out'])[11:16]; sh_e = str(shift['end_time'])[:5]
+                co_t = str(r['clock_out'])[11:16]
                 try:
                     early_mins = (int(sh_e[:2])*60+int(sh_e[3:5])) - (int(co_t[:2])*60+int(co_t[3:5]))
                     if early_mins > 15:
@@ -815,8 +835,8 @@ def api_anomaly_report_pdf():
                 except Exception: pass
         if anomaly_type:
             anomalies.append([r['staff_name'], r['department'] or '', ds,
-                               str(shift['start_time'])[:5] if shift else '—',
-                               str(shift['end_time'])[:5]   if shift else '—',
+                               str(shift['start_time'])[:5] if shift else fixed_start,
+                               str(shift['end_time'])[:5]   if shift else fixed_end,
                                str(r['clock_in'])[11:16]  if r['clock_in']  else '—',
                                str(r['clock_out'])[11:16] if r['clock_out'] else '—',
                                anomaly_type, detail])
@@ -831,13 +851,13 @@ def api_anomaly_report_pdf():
     anomalies.sort(key=lambda x: (x[2], x[0]))
     headers    = ['姓名', '部門', '日期', '應上班', '應下班', '實際上班', '實際下班', '異常類型', '說明']
     col_widths = [55, 55, 65, 45, 45, 50, 50, 55, 120]
-    buf = _build_pdf(f'{month} 出勤異常報告', f'製表：{_date.today().isoformat()}  共 {len(anomalies)} 筆',
+    buf = _build_pdf(f'{month} 出勤異常報告', f'製表：{_tw_today().isoformat()}  共 {len(anomalies)} 筆',
                      headers, col_widths, anomalies, landscape=True)
     return _pdf_response(buf, f'anomaly_{month}.pdf')
 
 
 @bp.route('/api/export/salary/pdf', methods=['GET'])
-@login_required
+@require_module('salary')
 def api_export_salary_pdf():
     month = request.args.get('month', '') or _dt.now(TW_TZ).strftime('%Y-%m')
     with get_db() as conn:
@@ -858,13 +878,13 @@ def api_export_salary_pdf():
              f"{float(r['net_pay'] or 0):,.0f}",
              '已確認' if r['status'] == 'confirmed' else '草稿']
             for r in rows]
-    buf = _build_pdf(f'{month} 薪資明細', f'製表：{_date.today().isoformat()}  共 {len(data)} 人',
+    buf = _build_pdf(f'{month} 薪資明細', f'製表：{_tw_today().isoformat()}  共 {len(data)} 人',
                      headers, col_widths, data, landscape=True)
     return _pdf_response(buf, f'salary_{month}.pdf')
 
 
 @bp.route('/api/export/leave/pdf', methods=['GET'])
-@login_required
+@require_module('leave')
 def api_export_leave_pdf():
     month = request.args.get('month', ''); year = request.args.get('year', '')
     staff_id = request.args.get('staff_id', ''); status = request.args.get('status', '')
@@ -892,13 +912,13 @@ def api_export_leave_pdf():
              STATUS_LABEL.get(r['status'], r['status'])]
             for r in rows]
     label = month or year or 'all'
-    buf = _build_pdf(f'{label} 請假記錄', f'製表：{_date.today().isoformat()}  共 {len(data)} 筆',
+    buf = _build_pdf(f'{label} 請假記錄', f'製表：{_tw_today().isoformat()}  共 {len(data)} 筆',
                      headers, col_widths, data, landscape=True)
     return _pdf_response(buf, f'leave_{label}.pdf')
 
 
 @bp.route('/api/export/leave-balance/pdf', methods=['GET'])
-@login_required
+@require_module('leave')
 def api_export_leave_balance_pdf():
     year = request.args.get('year', '') or str(_dt.now(TW_TZ).year)
     with get_db() as conn:
@@ -918,13 +938,13 @@ def api_export_leave_balance_pdf():
              str(round(float(r['max_days'] or 0) - float(r['used_days'] or 0), 2))
              if r['max_days'] is not None else '']
             for r in rows]
-    buf = _build_pdf(f'{year} 年假別餘額', f'製表：{_date.today().isoformat()}  共 {len(data)} 筆',
+    buf = _build_pdf(f'{year} 年假別餘額', f'製表：{_tw_today().isoformat()}  共 {len(data)} 筆',
                      headers, col_widths, data)
     return _pdf_response(buf, f'leave_balance_{year}.pdf')
 
 
 @bp.route('/api/export/overtime/pdf', methods=['GET'])
-@login_required
+@require_any_module('punch', 'salary')
 def api_export_overtime_pdf():
     month = request.args.get('month', ''); staff_id = request.args.get('staff_id', '')
     status = request.args.get('status', '')
@@ -948,13 +968,13 @@ def api_export_overtime_pdf():
              STATUS_LABEL.get(r['status'], r['status'])]
             for r in rows]
     label = month or 'all'
-    buf = _build_pdf(f'{label} 加班記錄', f'製表：{_date.today().isoformat()}  共 {len(data)} 筆',
+    buf = _build_pdf(f'{label} 加班記錄', f'製表：{_tw_today().isoformat()}  共 {len(data)} 筆',
                      headers, col_widths, data, landscape=True)
     return _pdf_response(buf, f'overtime_{label}.pdf')
 
 
 @bp.route('/api/export/staff/pdf', methods=['GET'])
-@login_required
+@require_module('punch')
 def api_export_staff_pdf():
     dept = request.args.get('department', ''); active = request.args.get('active', '1')
     conds, params = ['TRUE'], []
@@ -975,13 +995,13 @@ def api_export_staff_pdf():
              str(r['hire_date']) if r['hire_date'] else '',
              '在職' if r['active'] else '離職']
             for r in rows]
-    buf = _build_pdf('員工資料表', f'製表：{_date.today().isoformat()}  共 {len(data)} 人',
+    buf = _build_pdf('員工資料表', f'製表：{_tw_today().isoformat()}  共 {len(data)} 人',
                      headers, col_widths, data, landscape=True)
     return _pdf_response(buf, 'staff_list.pdf')
 
 
 @bp.route('/api/export/training/pdf', methods=['GET'])
-@login_required
+@require_module('training')
 def api_export_training_pdf():
     staff_id = request.args.get('staff_id', ''); category = request.args.get('category', '')
     conds, params = ['TRUE'], []
@@ -995,7 +1015,7 @@ def api_export_training_pdf():
         """, params).fetchall()
     CATEGORY_ZH = {'safety': '安全衛生', 'fire': '消防', 'food': '食品衛生',
                    'professional': '專業技能', 'general': '一般訓練'}
-    today = _date.today()
+    today = _tw_today()
     headers    = ['員工姓名', '部門', '課程名稱', '類別', '完訓日期', '到期日', '剩餘天數', '狀態']
     col_widths = [55, 60, 110, 60, 65, 65, 55, 55]
     data = []
@@ -1012,13 +1032,13 @@ def api_export_training_pdf():
                      str(r['completed_date']) if r['completed_date'] else '',
                      str(r['expiry_date']) if r['expiry_date'] else '',
                      days_left, status])
-    buf = _build_pdf('訓練記錄', f'製表：{_date.today().isoformat()}  共 {len(data)} 筆',
+    buf = _build_pdf('訓練記錄', f'製表：{_tw_today().isoformat()}  共 {len(data)} 筆',
                      headers, col_widths, data, landscape=True)
     return _pdf_response(buf, 'training_records.pdf')
 
 
 @bp.route('/api/export/expense/pdf', methods=['GET'])
-@login_required
+@require_module('expense-review')
 def api_export_expense_pdf():
     month = request.args.get('month', ''); staff_id = request.args.get('staff_id', '')
     status = request.args.get('status', '')
@@ -1041,7 +1061,7 @@ def api_export_expense_pdf():
              r['note'] or '', STATUS_LABEL.get(r['status'], r['status'])]
             for r in rows]
     label = month or 'all'
-    buf = _build_pdf(f'{label} 費用報帳', f'製表：{_date.today().isoformat()}  共 {len(data)} 筆',
+    buf = _build_pdf(f'{label} 費用報帳', f'製表：{_tw_today().isoformat()}  共 {len(data)} 筆',
                      headers, col_widths, data, landscape=True)
     return _pdf_response(buf, f'expense_{label}.pdf')
 
@@ -1050,7 +1070,7 @@ def api_export_expense_pdf():
 @require_module('salary')
 def api_export_withholding_pdf():
     from blueprints.finance import _get_finance_settings
-    year = request.args.get('year', str(_date.today().year))
+    year = request.args.get('year', str(_tw_today().year))
     fs   = _get_finance_settings()
     company_name = fs.get('company_name', '')
     with get_db() as conn:
@@ -1073,7 +1093,7 @@ def api_export_withholding_pdf():
              f"{supp_nhi(r['gross_salary'], r['avg_insured']):,.0f}",
              f"{float(r['tax_withheld']):,.0f}"]
             for i, r in enumerate(rows, 1)]
-    subtitle = f"扣繳義務人：{company_name}　製表：{_date.today().isoformat()}  共 {len(data)} 人"
+    subtitle = f"扣繳義務人：{company_name}　製表：{_tw_today().isoformat()}  共 {len(data)} 人"
     buf = _build_pdf(f'{year} 年度薪資所得扣繳憑單（所得類別50）', subtitle,
                      headers, col_widths, data)
     return _pdf_response(buf, f'withholding_{year}.pdf')
@@ -1107,7 +1127,7 @@ def api_edi_labor_enroll():
 @bp.route('/api/export/edi/labor-salary', methods=['GET'])
 @require_module('salary')
 def api_edi_labor_salary():
-    month     = request.args.get('month', '') or _date.today().strftime('%Y-%m')
+    month     = request.args.get('month', '') or _tw_today().strftime('%Y-%m')
     staff_ids = request.args.get('staff_ids', '')
     cfg       = _get_insurance_settings()
     labor_no  = cfg.get('labor_insurance_no', '').ljust(8)[:8]

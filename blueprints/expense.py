@@ -5,7 +5,7 @@ import json as _json
 
 from flask import Blueprint, session, request, jsonify, Response
 
-from auth import login_required
+from auth import login_required, require_module
 from db import get_db
 from config import ANTHROPIC_API_KEY
 from blueprints.notifications import _notify_review_result
@@ -134,7 +134,7 @@ def api_expense_ocr():
 # ── Admin endpoints ───────────────────────────────────────────────────────────
 
 @bp.route('/api/expense/claims', methods=['GET'])
-@login_required
+@require_module('expense-review')
 def api_expense_admin_list():
     status = request.args.get('status', '')
     conds, params = ['TRUE'], []
@@ -157,7 +157,7 @@ def api_expense_admin_list():
 
 
 @bp.route('/api/expense/claims/<int:cid>', methods=['PUT'])
-@login_required
+@require_module('expense-review')
 def api_expense_review(cid):
     b      = request.get_json(force=True)
     action = b.get('action')  # approve / reject

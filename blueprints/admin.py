@@ -5,8 +5,9 @@ import json as _json
 
 from flask import Blueprint, session, request, jsonify, redirect, url_for, render_template
 
-from auth import login_required, require_super
-from db import get_db, _hash_pw
+from auth import (login_required, require_super,
+                  login_blocked, record_login_failure, clear_login_failures, LOGIN_BLOCKED_MSG)
+from db import get_db, hash_password, verify_password, is_legacy_hash
 
 bp = Blueprint('admin', __name__)
 
@@ -26,13 +27,20 @@ def admin_login():
         password = request.form.get('password', '').strip()
         if not username or not password:
             error = '請輸入帳號與密碼'
+        elif login_blocked(username):
+            error = LOGIN_BLOCKED_MSG
         else:
             with get_db() as conn:
                 row = conn.execute(
                     "SELECT * FROM admin_accounts WHERE username=%s AND active=TRUE",
                     (username,)
                 ).fetchone()
-            if row and row['password_hash'] == _hash_pw(password):
+            if row and verify_password(password, row['password_hash']):
+                clear_login_failures(username)
+                if is_legacy_hash(row['password_hash']):
+                    with get_db() as conn:
+                        conn.execute("UPDATE admin_accounts SET password_hash=%s WHERE id=%s",
+                                     (hash_password(password), row['id']))
                 perms = row['permissions']
                 if isinstance(perms, str):
                     try: perms = _json.loads(perms)
@@ -46,6 +54,7 @@ def admin_login():
                 with get_db() as conn:
                     conn.execute("UPDATE admin_accounts SET last_login_at=NOW() WHERE id=%s", (row['id'],))
                 return redirect(url_for('admin.admin_dashboard'))
+            record_login_failure(username)
             error = '帳號或密碼錯誤'
     return render_template('login.html', error=error)
 
@@ -75,7 +84,7 @@ def _admin_row(r):
     if not r: return None
     d = dict(r)
     d.pop('password_hash', None)
-    if d.get('password_plain') is None: d['password_plain'] = ''
+    d.pop('password_plain', None)
     perms = d.get('permissions')
     if isinstance(perms, str):
         try: d['permissions'] = _json.loads(perms)
@@ -112,14 +121,14 @@ def api_admin_account_create():
     username = b.get('username', '').strip()
     password = b.get('password', '').strip()
     if not username: return jsonify({'error': '帳號為必填'}), 400
-    if not password or len(password) < 4: return jsonify({'error': '密碼至少 4 個字元'}), 400
+    if not password or len(password) < 8: return jsonify({'error': '密碼至少 8 個字元'}), 400
     perms = b.get('permissions', [])
     with get_db() as conn:
         try:
             row = conn.execute("""
-                INSERT INTO admin_accounts (username, password_hash, password_plain, display_name, permissions, is_super, active)
-                VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING *
-            """, (username, _hash_pw(password), password, b.get('display_name', '').strip(),
+                INSERT INTO admin_accounts (username, password_hash, display_name, permissions, is_super, active)
+                VALUES (%s,%s,%s,%s,%s,%s) RETURNING *
+            """, (username, hash_password(password), b.get('display_name', '').strip(),
                   _json.dumps(perms), bool(b.get('is_super', False)), True)).fetchone()
         except Exception as e:
             if 'unique' in str(e).lower(): return jsonify({'error': '帳號已存在'}), 409
@@ -137,11 +146,11 @@ def api_admin_account_update(aid):
     perms = b.get('permissions', [])
     with get_db() as conn:
         if password:
-            if len(password) < 4: return jsonify({'error': '密碼至少 4 個字元'}), 400
+            if len(password) < 8: return jsonify({'error': '密碼至少 8 個字元'}), 400
             row = conn.execute("""
-                UPDATE admin_accounts SET username=%s, password_hash=%s, password_plain=%s, display_name=%s,
+                UPDATE admin_accounts SET username=%s, password_hash=%s, display_name=%s,
                   permissions=%s, is_super=%s, active=%s WHERE id=%s RETURNING *
-            """, (username, _hash_pw(password), password, b.get('display_name', '').strip(),
+            """, (username, hash_password(password), b.get('display_name', '').strip(),
                   _json.dumps(perms), bool(b.get('is_super', False)),
                   bool(b.get('active', True)), aid)).fetchone()
         else:

@@ -10,7 +10,7 @@ import jwt as _pyjwt
 from flask import Blueprint, request, jsonify, g
 
 from config import TW_TZ, MOBILE_JWT_SECRET, JWT_EXPIRE_HOURS
-from db import get_db, _hash_pw
+from db import get_db, hash_password, verify_password, is_legacy_hash
 
 bp = Blueprint('mobile', __name__)
 
@@ -80,12 +80,20 @@ def mobile_login():
     password = b.get('password', '').strip()
     if not username or not password:
         return jsonify({'error': '請輸入帳號及密碼'}), 400
+    from auth import login_blocked, record_login_failure, clear_login_failures, LOGIN_BLOCKED_MSG
+    if login_blocked(username):
+        return jsonify({'error': LOGIN_BLOCKED_MSG}), 429
 
     with get_db() as conn:
         admin = conn.execute(
             "SELECT * FROM admin_accounts WHERE username=%s AND active=TRUE", (username,)
         ).fetchone()
-    if admin and admin['password_hash'] == _hash_pw(password):
+    if admin and verify_password(password, admin['password_hash']):
+        clear_login_failures(username)
+        if is_legacy_hash(admin['password_hash']):
+            with get_db() as conn:
+                conn.execute("UPDATE admin_accounts SET password_hash=%s WHERE id=%s",
+                             (hash_password(password), admin['id']))
         perms = admin['permissions']
         if isinstance(perms, str):
             try: perms = _json.loads(perms)
@@ -112,7 +120,12 @@ def mobile_login():
         staff = conn.execute(
             "SELECT * FROM punch_staff WHERE username=%s AND active=TRUE", (username,)
         ).fetchone()
-    if staff and staff['password_hash'] == _hash_pw(password):
+    if staff and verify_password(password, staff['password_hash']):
+        clear_login_failures(username)
+        if is_legacy_hash(staff['password_hash']):
+            with get_db() as conn:
+                conn.execute("UPDATE punch_staff SET password_hash=%s WHERE id=%s",
+                             (hash_password(password), staff['id']))
         token = _make_jwt({
             'sub': str(staff['id']), 'role': 'employee',
             'staff_id': staff['id'], 'name': staff['name'], 'username': staff['username'],
@@ -126,6 +139,7 @@ def mobile_login():
             }
         })
 
+    record_login_failure(username)
     return jsonify({'error': '帳號或密碼錯誤'}), 401
 
 
@@ -657,15 +671,37 @@ def mobile_admin_anomalies():
                WHERE date_trunc('month', punched_at AT TIME ZONE 'Asia/Taipei') = %s::date""",
             (f'{y}-{m:02d}-01',)
         ).fetchall()
+        shift_counts = conn.execute(
+            """SELECT staff_id, COUNT(*) AS n FROM shift_assignments
+               WHERE TO_CHAR(shift_date,'YYYY-MM')=%s AND shift_date <= %s
+               GROUP BY staff_id""",
+            (month, _dt.now(TW_TZ).date())
+        ).fetchall()
+        holiday_rows = conn.execute(
+            "SELECT date FROM public_holidays WHERE TO_CHAR(date,'YYYY-MM')=%s"
+        , (month,)).fetchall()
     by_staff = defaultdict(set)
     for r in records:
         by_staff[r['staff_id']].add(str(r['day']))
+    expected_by_staff = {r['staff_id']: r['n'] for r in shift_counts}
+
+    # 無排班者（固定工時公司）：預期工作天 = 本月至今的平日扣除國定假日
+    holiday_dates = {str(r['date']) for r in holiday_rows}
+    today = _dt.now(TW_TZ).date()
+    last = min(today, date(y, m, calendar.monthrange(y, m)[1]))
+    default_expected = 0
+    if last >= date(y, m, 1):
+        for dnum in range(1, last.day + 1):
+            d = date(y, m, dnum)
+            if d.weekday() < 5 and d.isoformat() not in holiday_dates:
+                default_expected += 1
 
     result = []
     for s in staff_all:
         work_days = len(by_staff[s['id']])
+        expected  = expected_by_staff.get(s['id'], default_expected)
         result.append({
             'id': s['id'], 'name': s['name'], 'department': s['department'],
-            'work_days': work_days, 'missing_days': max(0, 22 - work_days),
+            'work_days': work_days, 'missing_days': max(0, expected - work_days),
         })
     return jsonify(result)

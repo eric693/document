@@ -8,7 +8,7 @@ import urllib.request
 
 from flask import Blueprint, request, jsonify
 
-from auth import login_required
+from auth import login_required, require_module
 from db import get_db
 from blueprints.performance import _grade_labels
 
@@ -17,7 +17,6 @@ bp = Blueprint('line_bot', __name__)
 # ─── Global state ─────────────────────────────────────────────────────────────
 
 CUSTOM_RICHMENU_IMAGE_PATH = '/tmp/custom_richmenu.png'
-_pending_line_punches = {}          # {line_user_id: punch_type}
 _line_reply_ctx = _threading.local()  # holds reply_token per request thread
 
 
@@ -139,9 +138,9 @@ def _handle_line_punch_event(event, cfg):
     if evt_type == 'follow':
         _send_line_punch(user_id,
             '歡迎使用員工打卡系統！👋\n\n'
-            '請輸入您的登入帳號完成綁定。\n\n'
-            '✏️ 輸入範例：\n  綁定 mary123\n'
-            '（請將 mary123 換成您自己的帳號）\n\n'
+            '請輸入您的登入帳號與密碼完成綁定。\n\n'
+            '✏️ 輸入範例：\n  綁定 mary123 您的密碼\n'
+            '（請換成您自己的帳號與密碼）\n\n'
             '不知道帳號？請詢問管理員。')
         return
 
@@ -157,26 +156,38 @@ def _handle_line_punch_event(event, cfg):
         if msg_type == 'text':
             text = msg.get('text', '').strip()
             if text.startswith('綁定 ') or text.startswith('绑定 '):
-                username = text.split(' ', 1)[1].strip()
+                from db import verify_password, hash_password, is_legacy_hash
+                parts = text.split()
+                if len(parts) < 3:
+                    _send_line_punch(user_id,
+                        '為確保帳號安全，綁定需要驗證密碼。\n\n'
+                        '✏️ 輸入格式：\n  綁定 帳號 密碼\n\n'
+                        '範例：綁定 mary123 您的密碼')
+                    return
+                username, password = parts[1].strip(), parts[2].strip()
                 if username in ('帳號', '您的帳號', '[您的帳號]', 'username', '帳號名稱'):
                     _send_line_punch(user_id,
                         '請輸入您「實際的」登入帳號，而非說明文字。\n\n'
-                        '範例：綁定 mary123')
+                        '範例：綁定 mary123 您的密碼')
                     return
                 with get_db() as conn:
                     candidate = conn.execute(
                         "SELECT * FROM punch_staff WHERE username=%s AND active=TRUE",
                         (username,)
                     ).fetchone()
-                if not candidate:
+                if not candidate or not verify_password(password, candidate['password_hash']):
                     _send_line_punch(user_id,
-                        f'找不到帳號「{username}」\n\n'
-                        '請確認帳號是否正確，或詢問管理員您的登入帳號。')
+                        '帳號或密碼錯誤。\n\n'
+                        '請確認後重新輸入：綁定 帳號 密碼\n'
+                        '忘記密碼請詢問管理員。')
                     return
                 if candidate['line_user_id']:
                     _send_line_punch(user_id, '此帳號已綁定其他 LINE 帳號，請聯絡管理員。')
                     return
                 with get_db() as conn:
+                    if is_legacy_hash(candidate['password_hash']):
+                        conn.execute("UPDATE punch_staff SET password_hash=%s WHERE id=%s",
+                                     (hash_password(password), candidate['id']))
                     conn.execute(
                         "UPDATE punch_staff SET line_user_id=%s WHERE id=%s",
                         (user_id, candidate['id'])
@@ -189,8 +200,8 @@ def _handle_line_punch_event(event, cfg):
             else:
                 _send_line_punch(user_id,
                     '您尚未綁定打卡帳號。\n\n'
-                    '請輸入您的登入帳號：\n  綁定 [您的帳號]\n\n'
-                    '範例：綁定 mary123')
+                    '請輸入您的帳號與密碼：\n  綁定 帳號 密碼\n\n'
+                    '範例：綁定 mary123 您的密碼')
         return
 
     # ── Bound staff ────────────────────────────────────────────────────────────
@@ -228,17 +239,17 @@ def _handle_line_punch_event(event, cfg):
             gps_required = pcfg['gps_required'] if pcfg else False
             if gps_required and locs:
                 from linebot.models import QuickReply, QuickReplyButton, LocationAction
-                # 先把打卡意圖持久化（記憶體 + 資料庫），再提示傳送位置。
-                # 順序很重要：提示送出後若 server 重啟，記憶體會遺失，但 DB 已保存意圖，
-                # 位置進來時才能正確判斷上班/下班，不致誤記（下班被記成上班）。
-                _pending_line_punches[user_id] = punch_type
+                # 打卡意圖只存 DB：gunicorn 有多個 worker，行程記憶體不共享也不會過期，
+                # 存記憶體會讓位置訊息被另一個 worker 接到時讀到舊意圖（上下班顛倒）。
                 try:
                     with get_db() as conn:
                         conn.execute(
                             "UPDATE punch_staff SET pending_punch_type=%s, pending_punch_at=NOW() WHERE id=%s",
                             (punch_type, staff['id']))
                 except Exception as e:
-                    print(f"[LINE PUNCH] save pending failed (ignored): {e}")
+                    print(f"[LINE PUNCH] save pending failed: {e}")
+                    _send_line_punch(user_id, '系統忙碌中，請稍後再試一次。')
+                    return
                 cfg_lp = get_line_punch_config()
                 if cfg_lp and cfg_lp.get('enabled') and cfg_lp.get('channel_access_token'):
                     qr = QuickReply(items=[QuickReplyButton(action=LocationAction(label='📍 傳送位置'))])
@@ -285,10 +296,10 @@ def _do_line_punch(staff, user_id, lat, lng, forced_type, PUNCH_LABEL):
     TW = _tz3(_td3(hours=8))
 
     # Determine punch type
-    # 暫存的打卡意圖（按「上班/下班」後等待傳送位置）改以 DB 持久化，
-    # 避免 worker 重啟導致記憶體 dict 遺失而誤判（按上班卻記成下班）。
-    pending = _pending_line_punches.get(user_id)
-    if not pending and not forced_type:
+    # 打卡意圖（按「上班/下班」後等待傳送位置）只存 DB、不存行程記憶體：
+    # 多 worker 下記憶體不共享且不會過期，讀到別次的舊意圖會把上下班記反。
+    pending = None
+    if not forced_type:
         try:
             with get_db() as conn:
                 prow = conn.execute("""
@@ -366,8 +377,7 @@ def _do_line_punch(staff, user_id, lat, lng, forced_type, PUNCH_LABEL):
 
     # 打卡成功後才清除暫存意圖；獨立交易且 best-effort——
     # 即使 pending 欄位不存在或更新失敗，也絕不能影響已完成的打卡。
-    if from_pending or _pending_line_punches.get(user_id):
-        _pending_line_punches.pop(user_id, None)
+    if from_pending:
         try:
             with get_db() as conn:
                 conn.execute(
@@ -975,7 +985,7 @@ def _line_show_leave_types(staff, user_id):
 # ─── Admin LINE config API ────────────────────────────────────────────────────
 
 @bp.route('/api/line-punch/config', methods=['GET'])
-@login_required
+@require_module('punch')
 def api_line_punch_config_get():
     with get_db() as conn:
         row = conn.execute("SELECT * FROM line_punch_config WHERE id=1").fetchone()
@@ -987,7 +997,7 @@ def api_line_punch_config_get():
 
 
 @bp.route('/api/line-punch/config', methods=['PUT'])
-@login_required
+@require_module('punch')
 def api_line_punch_config_put():
     b       = request.get_json(force=True) or {}
     token   = b.get('channel_access_token', '').strip()
@@ -1006,7 +1016,7 @@ def api_line_punch_config_put():
 
 
 @bp.route('/api/line-punch/staff', methods=['GET'])
-@login_required
+@require_module('punch')
 def api_line_punch_staff():
     with get_db() as conn:
         rows = conn.execute(
@@ -1021,7 +1031,7 @@ def api_line_punch_staff():
 
 
 @bp.route('/api/line-punch/staff/<int:sid>/unbind', methods=['POST'])
-@login_required
+@require_module('punch')
 def api_line_punch_unbind(sid):
     with get_db() as conn:
         conn.execute("UPDATE punch_staff SET line_user_id=NULL WHERE id=%s", (sid,))
@@ -1075,7 +1085,7 @@ def _make_richmenu_png():
 
 
 @bp.route('/api/line-punch/richmenu/create', methods=['POST'])
-@login_required
+@require_module('punch')
 def api_richmenu_create():
     cfg = get_line_punch_config()
     if not cfg or not cfg.get('channel_access_token'):
@@ -1165,7 +1175,7 @@ def api_richmenu_create():
 
 
 @bp.route('/api/line-punch/richmenu/list', methods=['GET'])
-@login_required
+@require_module('punch')
 def api_richmenu_list():
     cfg = get_line_punch_config()
     if not cfg or not cfg.get('channel_access_token'):
@@ -1177,7 +1187,7 @@ def api_richmenu_list():
 
 
 @bp.route('/api/line-punch/richmenu/<rich_menu_id>', methods=['DELETE'])
-@login_required
+@require_module('punch')
 def api_richmenu_delete(rich_menu_id):
     cfg = get_line_punch_config()
     if not cfg or not cfg.get('channel_access_token'):
@@ -1188,7 +1198,7 @@ def api_richmenu_delete(rich_menu_id):
 
 
 @bp.route('/api/line-punch/richmenu/default', methods=['DELETE'])
-@login_required
+@require_module('punch')
 def api_richmenu_unset_default():
     cfg = get_line_punch_config()
     if not cfg or not cfg.get('channel_access_token'):

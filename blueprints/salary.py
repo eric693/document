@@ -731,8 +731,8 @@ def api_my_payslip():
         return jsonify({'error': '請先登入'}), 401
     month = request.args.get('month', '')
     if not month:
-        from datetime import date as _dp
-        month = _dp.today().strftime('%Y-%m')
+        from datetime import datetime as _dtp
+        month = _dtp.now(TW_TZ).strftime('%Y-%m')
     with get_db() as conn:
         row = conn.execute("""
             SELECT sr.*, ps.name as staff_name, ps.role as staff_role,

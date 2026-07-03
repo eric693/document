@@ -6,7 +6,7 @@ from datetime import datetime as _dt, timedelta as _td, timezone as _tz, date as
 
 from flask import Blueprint, request, jsonify
 
-from auth import login_required, require_module
+from auth import login_required, require_module, require_any_module
 from config import TW_TZ
 from db import get_db
 
@@ -290,7 +290,7 @@ def api_dashboard():
 @bp.route('/api/dashboard/labor-cost', methods=['GET'])
 @login_required
 def api_dashboard_labor_cost():
-    today = _date.today()
+    today = _dt.now(TW_TZ).date()
     months = []
     for i in range(11, -1, -1):
         m = today.month - i; y = today.year
@@ -309,7 +309,7 @@ def api_dashboard_labor_cost():
 @login_required
 def api_dashboard_attendance_heatmap():
     import calendar as _calh
-    month = request.args.get('month', '') or _date.today().strftime('%Y-%m')
+    month = request.args.get('month', '') or _dt.now(TW_TZ).date().strftime('%Y-%m')
     y, mo = int(month[:4]), int(month[5:7])
     days_in = _calh.monthrange(y, mo)[1]
     with get_db() as conn:
@@ -334,7 +334,7 @@ def api_dashboard_attendance_heatmap():
 @bp.route('/api/dashboard/leave-distribution', methods=['GET'])
 @login_required
 def api_dashboard_leave_distribution():
-    year = request.args.get('year', str(_date.today().year))
+    year = request.args.get('year', str(_dt.now(TW_TZ).date().year))
     with get_db() as conn:
         rows = conn.execute("""
             SELECT lt.name, lt.color, COUNT(*) as cnt, COALESCE(SUM(lr.total_days), 0) as days
@@ -363,7 +363,7 @@ def api_stores_list():
 
 
 @bp.route('/api/stores', methods=['POST'])
-@login_required
+@require_module('stores')
 def api_stores_create():
     b = request.get_json(force=True)
     name = (b.get('name') or '').strip()
@@ -377,7 +377,7 @@ def api_stores_create():
 
 
 @bp.route('/api/stores/<int:sid>', methods=['PUT'])
-@login_required
+@require_module('stores')
 def api_stores_update(sid):
     b = request.get_json(force=True)
     with get_db() as conn:
@@ -390,7 +390,7 @@ def api_stores_update(sid):
 
 
 @bp.route('/api/stores/<int:sid>', methods=['DELETE'])
-@login_required
+@require_module('stores')
 def api_stores_delete(sid):
     with get_db() as conn:
         conn.execute("UPDATE punch_staff SET store_id=NULL WHERE store_id=%s", (sid,))
@@ -399,7 +399,7 @@ def api_stores_delete(sid):
 
 
 @bp.route('/api/stores/<int:sid>/staff', methods=['GET'])
-@login_required
+@require_module('stores')
 def api_store_staff(sid):
     with get_db() as conn:
         rows = conn.execute(
@@ -409,7 +409,7 @@ def api_store_staff(sid):
 
 
 @bp.route('/api/staff/<int:sid>/store', methods=['PUT'])
-@login_required
+@require_any_module('stores', 'punch')
 def api_staff_assign_store(sid):
     b = request.get_json(force=True)
     store_id = b.get('store_id')
@@ -485,6 +485,12 @@ def api_attendance_anomalies():
         all_staff = conn.execute(
             "SELECT id, name, role, department FROM punch_staff WHERE active=TRUE"
         ).fetchall()
+        # 無排班公司（固定工時）改用打卡設定的固定上下班時間判斷遲到/早退
+        _cfg = conn.execute(
+            "SELECT work_start_time, work_end_time FROM punch_config WHERE id=1"
+        ).fetchone()
+        fixed_start = (_cfg and _cfg.get('work_start_time')) or '08:00'
+        fixed_end   = (_cfg and _cfg.get('work_end_time'))   or '17:00'
         today_punched_ids = {r['staff_id'] for r in rows if str(r['work_date']) == str(today)}
         leave_today = conn.execute("""
             SELECT DISTINCT staff_id FROM leave_requests
@@ -510,32 +516,32 @@ def api_attendance_anomalies():
                                'detail': f"下班 {r['last_out']}，無上班記錄"})
         if has_in and r['first_in']:
             shift = shift_map.get((r['staff_id'], ds))
-            if shift and shift['start_time']:
-                try:
-                    sh, sm = map(int, str(shift['start_time'])[:5].split(':'))
-                    ih, im = map(int, r['first_in'].split(':'))
-                    late_mins = (ih * 60 + im) - (sh * 60 + sm)
-                    if late_mins > 10:
-                        anomalies.append({'type': 'late', 'label': '遲到', 'severity': 'warning',
-                                          'staff_id': r['staff_id'], 'name': r['name'], 'role': r['role'] or '',
-                                          'department': r['department'] or '', 'date': ds,
-                                          'detail': f"應 {str(shift['start_time'])[:5]} 上班，實際 {r['first_in']}（晚 {late_mins} 分鐘）"})
-                except Exception:
-                    pass
+            expected_start = str(shift['start_time'])[:5] if (shift and shift['start_time']) else fixed_start
+            try:
+                sh, sm = map(int, expected_start.split(':'))
+                ih, im = map(int, r['first_in'].split(':'))
+                late_mins = (ih * 60 + im) - (sh * 60 + sm)
+                if late_mins > 10:
+                    anomalies.append({'type': 'late', 'label': '遲到', 'severity': 'warning',
+                                      'staff_id': r['staff_id'], 'name': r['name'], 'role': r['role'] or '',
+                                      'department': r['department'] or '', 'date': ds,
+                                      'detail': f"應 {expected_start} 上班，實際 {r['first_in']}（晚 {late_mins} 分鐘）"})
+            except Exception:
+                pass
         if has_out and r['last_out'] and ds != str(today):
             shift = shift_map.get((r['staff_id'], ds))
-            if shift and shift['end_time']:
-                try:
-                    eh, em = map(int, str(shift['end_time'])[:5].split(':'))
-                    oh, om = map(int, r['last_out'].split(':'))
-                    early_mins = (eh * 60 + em) - (oh * 60 + om)
-                    if early_mins > 15:
-                        anomalies.append({'type': 'early', 'label': '早退', 'severity': 'warning',
-                                          'staff_id': r['staff_id'], 'name': r['name'], 'role': r['role'] or '',
-                                          'department': r['department'] or '', 'date': ds,
-                                          'detail': f"應 {str(shift['end_time'])[:5]} 下班，實際 {r['last_out']}（早 {early_mins} 分鐘）"})
-                except Exception:
-                    pass
+            expected_end = str(shift['end_time'])[:5] if (shift and shift['end_time']) else fixed_end
+            try:
+                eh, em = map(int, expected_end.split(':'))
+                oh, om = map(int, r['last_out'].split(':'))
+                early_mins = (eh * 60 + em) - (oh * 60 + om)
+                if early_mins > 15:
+                    anomalies.append({'type': 'early', 'label': '早退', 'severity': 'warning',
+                                      'staff_id': r['staff_id'], 'name': r['name'], 'role': r['role'] or '',
+                                      'department': r['department'] or '', 'date': ds,
+                                      'detail': f"應 {expected_end} 下班，實際 {r['last_out']}（早 {early_mins} 分鐘）"})
+            except Exception:
+                pass
 
     for s in all_staff:
         if s['id'] not in today_punched_ids and s['id'] not in on_leave_today_ids:
@@ -550,7 +556,7 @@ def api_attendance_anomalies():
 
 
 @bp.route('/api/attendance/batch-fix', methods=['POST'])
-@login_required
+@require_module('punch')
 def api_attendance_batch_fix():
     """批次補登忘記上/下班打卡——依當日排班的應上/下班時間補上缺漏的打卡；
     無排班時改用打卡設定中的固定上下班時間（適用不排班、固定工時的公司）。"""

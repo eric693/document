@@ -17,6 +17,11 @@ from db import init_db
 # ── Flask App ──────────────────────────────────────────────────────
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(32))
+app.config.update(
+    SESSION_COOKIE_SECURE=True,      # 只透過 HTTPS 傳送（nginx 反代 TLS）
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE='Lax',   # 阻擋跨站 POST 帶 cookie（CSRF 緩解）
+)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 print(f"[startup] DATABASE_URL prefix: {DATABASE_URL[:20] if DATABASE_URL else 'NOT SET'}")

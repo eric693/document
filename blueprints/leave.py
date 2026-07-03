@@ -6,6 +6,7 @@ from datetime import datetime as _dt
 from flask import Blueprint, session, request, jsonify
 
 from auth import require_module
+from config import TW_TZ
 from db import get_db
 from blueprints.notifications import _notify_review_result
 
@@ -146,7 +147,7 @@ def _calc_annual_leave_days(hire_date_str, ref_date_str=None):
     except Exception:
         return 0
 
-    ref = _date.today()
+    ref = _dt.now(TW_TZ).date()
     if ref_date_str:
         try:
             ref = _date.fromisoformat(str(ref_date_str))
@@ -183,7 +184,7 @@ def _calc_annual_leave_schedule(hire_date_str):
     except Exception:
         return []
 
-    today = _date.today()
+    today = _dt.now(TW_TZ).date()
 
     milestones = [
         (6,   3,  '滿6個月'),   (12,  7,  '滿1年'),   (24, 10,  '滿2年'),
@@ -419,14 +420,10 @@ def api_leave_request_review(rid):
             lt_chk = conn.execute("SELECT require_cert FROM leave_types WHERE id=%s", (old['leave_type_id'],)).fetchone()
             if lt_chk and lt_chk['require_cert'] and not old.get('document_id'):
                 return jsonify({'error': '此假別需要上傳病單/證明才能核准'}), 422
-        row = conn.execute("""
-            UPDATE leave_requests
-            SET status=%s, reviewed_by=%s, review_note=%s,
-                reviewed_at=NOW(), updated_at=NOW()
-            WHERE id=%s RETURNING *
-        """, (new_status, reviewed_by, review_note, rid)).fetchone()
         delta = float(old['total_days'])
         lt = conn.execute("SELECT * FROM leave_types WHERE id=%s", (old['leave_type_id'],)).fetchone()
+        # 餘額檢查必須在改狀態之前——422 return 會正常離開 with 區塊而 commit，
+        # 若先 UPDATE 再檢查，假單會被標成已核准但沒扣假
         if action == 'approve' and old_status != 'approved':
             if lt and lt['max_days'] is not None:
                 year = str(old['start_date'])[:4]
@@ -443,6 +440,13 @@ def api_leave_request_review(rid):
                 if used + delta > float(lt['max_days']):
                     remaining = float(lt['max_days']) - used
                     return jsonify({'error': f'{lt["name"]}餘額不足（剩 {remaining} 天），無法核准'}), 422
+        row = conn.execute("""
+            UPDATE leave_requests
+            SET status=%s, reviewed_by=%s, review_note=%s,
+                reviewed_at=NOW(), updated_at=NOW()
+            WHERE id=%s RETURNING *
+        """, (new_status, reviewed_by, review_note, rid)).fetchone()
+        if action == 'approve' and old_status != 'approved':
             _update_leave_balance(conn, old['staff_id'], old['leave_type_id'],
                                   str(old['start_date'])[:4], delta)
         elif action == 'reject' and old_status == 'approved':
@@ -617,8 +621,8 @@ def api_leave_balances():
         if not sid: return jsonify({'error': 'not logged in'}), 401
         staff_id = str(sid)
     if not year:
-        from datetime import date as _d2
-        year = str(_d2.today().year)
+        from datetime import datetime as _dt2
+        year = str(_dt2.now(TW_TZ).year)
     conds, params = ["lb.year=%s"], [int(year)]
     if staff_id: conds.append("lb.staff_id=%s"); params.append(int(staff_id))
     with get_db() as conn:

@@ -517,7 +517,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <div class="card">
         <div class="table-wrap">
           <table>
-            <thead><tr><th style="width:32px"></th><th>姓名</th><th>員工代碼</th><th>部門/職稱</th><th>帳號</th><th>密碼</th><th>匯款帳號</th><th>狀態</th><th>操作</th></tr></thead>
+            <thead><tr><th style="width:32px"></th><th>姓名</th><th>員工代碼</th><th>部門/職稱</th><th>帳號</th><th>匯款帳號</th><th>狀態</th><th>操作</th></tr></thead>
             <tbody id="punch-staff-tbody"><tr><td colspan="8" class="empty-state"><div class="empty-state-text">載入中...</div></td></tr></tbody>
           </table>
         </div>
@@ -1690,7 +1690,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div class="card">
       <div class="table-wrap">
         <table>
-          <thead><tr><th>帳號</th><th>密碼</th><th>顯示名稱</th><th>可用模組</th><th>類型</th><th>上次登入</th><th>狀態</th><th>操作</th></tr></thead>
+          <thead><tr><th>帳號</th><th>顯示名稱</th><th>可用模組</th><th>類型</th><th>上次登入</th><th>狀態</th><th>操作</th></tr></thead>
           <tbody id="adminacc-tbody"><tr><td colspan="7" class="empty-state"><div class="empty-state-text">載入中...</div></td></tr></tbody>
         </table>
       </div>
@@ -4380,7 +4380,7 @@ function openPunchStaffModal(id=null) {
     document.getElementById('psm-birth-date').value     = s.birth_date || '';
     document.getElementById('psm-username').value       = s.username || '';
     document.getElementById('psm-active').value         = s.active ? '1' : '0';
-    document.getElementById('psm-password').value       = s.password_plain || '';
+    document.getElementById('psm-password').value       = '';
     document.getElementById('psm-pw-hint').textContent  = '留空表示不修改密碼';
     document.getElementById('psm-bank-code').value      = s.bank_code     || '';
     document.getElementById('psm-bank-name').value      = s.bank_name     || '';
@@ -6172,12 +6172,12 @@ async function bulkPrintPayslips() {
     const attend = isH
       ? `實際工時 ${d.actual_work_hours}h × 時薪 $${fmtNum(d.hourly_rate)} = $${fmtNum(d.hourly_base_pay)}`
       : `出勤 ${d.actual_days} 天 ／ 本月工作日 ${d.work_days} 天${d.leave_days>0?' ／ 請假 '+d.leave_days+'天':''}${d.ot_pay>0?' ／ 加班費 $'+fmtNum(d.ot_pay):''}`;
-    const aRows = aItems.map(i=>`<tr><td>${i.name}</td><td class="num gr">+$${fmtNum(i.amount)}</td><td style="font-size:10px;color:#888">${i.calc_note||''}</td></tr>`).join('');
-    const dRows = dItems.map(i=>`<tr><td>${i.name}</td><td class="num rd">-$${fmtNum(i.amount)}</td><td style="font-size:10px;color:#888">${i.calc_note||''}</td></tr>`).join('');
+    const aRows = aItems.map(i=>`<tr><td>${escHtml(i.name)}</td><td class="num gr">+$${fmtNum(i.amount)}</td><td style="font-size:10px;color:#888">${escHtml(i.calc_note||'')}</td></tr>`).join('');
+    const dRows = dItems.map(i=>`<tr><td>${escHtml(i.name)}</td><td class="num rd">-$${fmtNum(i.amount)}</td><td style="font-size:10px;color:#888">${escHtml(i.calc_note||'')}</td></tr>`).join('');
     return `<div class="slip">
       <div class="hdr">
         <div><div class="co">薪　資　單</div><div class="title">${d.month} 月份</div></div>
-        <div class="info">姓名：<strong>${d.staff_name}</strong><br>代碼：${d.employee_code||'—'}<br>部門：${d.department||'—'}<br>${isH?'時薪制':'月薪制'}</div>
+        <div class="info">姓名：<strong>${escHtml(d.staff_name)}</strong><br>代碼：${escHtml(d.employee_code||'—')}<br>部門：${escHtml(d.department||'—')}<br>${isH?'時薪制':'月薪制'}</div>
       </div>
       <div class="kpi">
         <div class="kc"><div class="kl">支付總額</div><div class="kv g">$${fmtNum(d.allowance_total)}</div></div>
@@ -8636,7 +8636,7 @@ function openAdminAccModal(id=null) {
     document.getElementById('aam-is-super').checked = !!a.is_super;
     const perms = a.permissions||[];
     document.querySelectorAll('.aam-mod-cb').forEach(cb => { cb.checked = perms.includes(cb.dataset.mod); });
-    document.getElementById('aam-password').value = a.password_plain || '';
+    document.getElementById('aam-password').value = '';
   } else {
     document.getElementById('aam-username').value = '';
     document.getElementById('aam-display').value  = '';
@@ -10051,7 +10051,6 @@ function renderPunchStaff() {
     <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">${escHtml(s.employee_code||'—')}</td>
     <td style="color:var(--muted);font-size:13px">${escHtml(dept)}</td>
     <td style="font-family:'DM Mono',monospace;font-size:12px">${escHtml(s.username||'—')}</td>
-    <td style="font-family:'DM Mono',monospace;font-size:12px">${escHtml(s.password_plain||'—')}</td>
     <td>${bankInfo}</td>
     <td>${s.active ? '<span class="badge badge-ok">在職</span>' : '<span class="badge badge-warn">停用</span>'}</td>
     <td style="white-space:nowrap">
@@ -10304,7 +10303,6 @@ function renderAdminAccounts() {
     const lastLogin = a.last_login_at ? new Date(a.last_login_at).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—';
     return `<tr>
       <td style="font-family:'DM Mono',monospace;font-weight:600">${escHtml(a.username)}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:12px">${escHtml(a.password_plain||'—')}</td>
       <td>${escHtml(a.display_name||'')}</td>
       <td style="line-height:1.8">${modLabels}</td>
       <td>${typeLabel}</td>

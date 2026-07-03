@@ -2,10 +2,12 @@
 blueprints/performance.py — 績效考核模組
 """
 import json as _json
+from datetime import datetime as _dtm
 
 from flask import Blueprint, session, request, jsonify
 
-from auth import login_required
+from auth import login_required, require_module
+from config import TW_TZ
 from db import get_db
 from blueprints.notifications import _notify_staff_line
 
@@ -119,7 +121,7 @@ def _score_to_grade(pct):
 # ─── 考核範本 CRUD ────────────────────────────────────────────────────────────
 
 @bp.route('/api/performance/templates', methods=['GET'])
-@login_required
+@require_module('perf')
 def api_perf_templates_list():
     with get_db() as conn:
         rows = conn.execute(
@@ -129,7 +131,7 @@ def api_perf_templates_list():
 
 
 @bp.route('/api/performance/templates', methods=['POST'])
-@login_required
+@require_module('perf')
 def api_perf_template_create():
     b = request.get_json(force=True)
     name = (b.get('name') or '').strip()
@@ -145,7 +147,7 @@ def api_perf_template_create():
 
 
 @bp.route('/api/performance/templates/<int:tid>', methods=['PUT'])
-@login_required
+@require_module('perf')
 def api_perf_template_update(tid):
     b = request.get_json(force=True)
     with get_db() as conn:
@@ -160,7 +162,7 @@ def api_perf_template_update(tid):
 
 
 @bp.route('/api/performance/templates/<int:tid>', methods=['DELETE'])
-@login_required
+@require_module('perf')
 def api_perf_template_delete(tid):
     with get_db() as conn:
         conn.execute("DELETE FROM performance_templates WHERE id=%s", (tid,))
@@ -170,7 +172,7 @@ def api_perf_template_delete(tid):
 # ─── 考核記錄 CRUD ────────────────────────────────────────────────────────────
 
 @bp.route('/api/performance/reviews', methods=['GET'])
-@login_required
+@require_module('perf')
 def api_perf_reviews_list():
     staff_id = request.args.get('staff_id')
     period   = request.args.get('period')
@@ -199,7 +201,7 @@ def api_perf_reviews_list():
 
 
 @bp.route('/api/performance/reviews', methods=['POST'])
-@login_required
+@require_module('perf')
 def api_perf_review_create():
     b           = request.get_json(force=True)
     staff_id    = b.get('staff_id')
@@ -264,7 +266,7 @@ def api_perf_review_create():
 
 
 @bp.route('/api/performance/reviews/<int:rid>', methods=['PUT'])
-@login_required
+@require_module('perf')
 def api_perf_review_update(rid):
     b        = request.get_json(force=True)
     scores   = b.get('scores', {})
@@ -289,7 +291,7 @@ def api_perf_review_update(rid):
 
 
 @bp.route('/api/performance/reviews/<int:rid>/adjust-salary', methods=['POST'])
-@login_required
+@require_module('perf')
 def api_perf_adjust_salary(rid):
     """依考核結果調薪 — 直接更新員工底薪並記錄"""
     b     = request.get_json(force=True)
@@ -353,13 +355,13 @@ def api_perf_my_reviews():
 # ─── 評級設定 CRUD ────────────────────────────────────────────────────────────
 
 @bp.route('/api/performance/config', methods=['GET'])
-@login_required
+@require_module('perf')
 def api_perf_config_get():
     return jsonify({'grades': _get_grade_config()})
 
 
 @bp.route('/api/performance/config', methods=['PUT'])
-@login_required
+@require_module('perf')
 def api_perf_config_update():
     b      = request.get_json(force=True)
     grades = b.get('grades', [])
@@ -388,7 +390,7 @@ def api_perf_config_update():
 
 
 @bp.route('/api/export/performance', methods=['GET'])
-@login_required
+@require_module('perf')
 def api_export_performance():
     """匯出績效考核 Excel"""
     from blueprints.export_utils import _xl_workbook, _xl_write_header, _xl_write_rows, _xl_response
@@ -429,7 +431,7 @@ def api_export_performance():
 
 
 @bp.route('/api/export/performance/pdf', methods=['GET'])
-@login_required
+@require_module('perf')
 def api_export_performance_pdf():
     """匯出績效考核 PDF"""
     from blueprints.exports import _build_pdf, _pdf_response
@@ -457,6 +459,6 @@ def api_export_performance_pdf():
              r['grade'] or '', r['reviewer'] or '',
              str(r['reviewed_at'])[:10] if r.get('reviewed_at') else '']
             for r in rows]
-    buf = _build_pdf('績效考核報表', f'製表：{_date.today().isoformat()}  共 {len(data)} 筆',
+    buf = _build_pdf('績效考核報表', f'製表：{_dtm.now(TW_TZ).date().isoformat()}  共 {len(data)} 筆',
                      headers, col_widths, data, landscape=True)
     return _pdf_response(buf, f'performance_{period or "all"}.pdf')

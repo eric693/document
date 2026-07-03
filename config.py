@@ -18,9 +18,6 @@ LINE_CHANNEL_SECRET       = os.environ.get('LINE_CHANNEL_SECRET', '')
 _raw_db_url  = os.environ.get('DATABASE_URL', '')
 DATABASE_URL = _raw_db_url.replace('postgres://', 'postgresql://', 1) if _raw_db_url.startswith('postgres://') else _raw_db_url
 
-# ── Render keep-alive ─────────────────────────────────────────────
-RENDER_EXTERNAL_URL = os.environ.get('RENDER_EXTERNAL_URL', '')
-
 # ── 管理員預設密碼 ────────────────────────────────────────────────
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 

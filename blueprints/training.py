@@ -1,11 +1,12 @@
 """
 blueprints/training.py — 教育訓練追蹤模組
 """
-from datetime import date
+from datetime import date, datetime as _dtm
 
 from flask import Blueprint, request, jsonify
 
-from auth import login_required
+from auth import login_required, require_module
+from config import TW_TZ
 from db import get_db
 from blueprints.export_utils import _xl_workbook, _xl_write_header, _xl_response
 
@@ -50,7 +51,7 @@ TRAINING_CATEGORIES = {
 # ─── Routes ──────────────────────────────────────────────────────────────────
 
 @bp.route('/api/training/records', methods=['GET'])
-@login_required
+@require_module('training')
 def api_training_list():
     from datetime import datetime as _dt_tr
     staff_id  = request.args.get('staff_id')
@@ -84,7 +85,7 @@ def api_training_list():
         d = dict(r)
         for k in ('completed_date', 'expiry_date', 'created_at', 'updated_at'):
             if d.get(k): d[k] = str(d[k])
-        today = date.today()
+        today = _dtm.now(TW_TZ).date()
         if d.get('expiry_date'):
             ed = _dt_tr.strptime(d['expiry_date'], '%Y-%m-%d').date()
             days_left = (ed - today).days
@@ -98,7 +99,7 @@ def api_training_list():
 
 
 @bp.route('/api/training/records', methods=['POST'])
-@login_required
+@require_module('training')
 def api_training_create():
     b = request.get_json(force=True) or {}
     staff_id       = b.get('staff_id')
@@ -120,7 +121,7 @@ def api_training_create():
 
 
 @bp.route('/api/training/records/<int:rid>', methods=['PUT'])
-@login_required
+@require_module('training')
 def api_training_update(rid):
     b = request.get_json(force=True) or {}
     with get_db() as conn:
@@ -138,7 +139,7 @@ def api_training_update(rid):
 
 
 @bp.route('/api/training/records/<int:rid>', methods=['DELETE'])
-@login_required
+@require_module('training')
 def api_training_delete(rid):
     with get_db() as conn:
         conn.execute("DELETE FROM training_records WHERE id=%s", (rid,))
@@ -146,7 +147,7 @@ def api_training_delete(rid):
 
 
 @bp.route('/api/training/summary', methods=['GET'])
-@login_required
+@require_module('training')
 def api_training_summary():
     """每位員工的訓練狀況摘要"""
     with get_db() as conn:
@@ -182,7 +183,7 @@ def api_training_summary():
 
 
 @bp.route('/api/export/training', methods=['GET'])
-@login_required
+@require_module('training')
 def api_export_training():
     """匯出訓練記錄 Excel"""
     staff_id = request.args.get('staff_id', '')
@@ -201,7 +202,7 @@ def api_export_training():
             ORDER BY tr.expiry_date ASC NULLS LAST, ps.name
         """, params).fetchall()
 
-    today = date.today()
+    today = _dtm.now(TW_TZ).date()
     CATEGORY_ZH = {'safety':'安全衛生','fire':'消防','food':'食品衛生',
                    'professional':'專業技能','general':'一般訓練'}
     for k, v in TRAINING_CATEGORIES.items():

@@ -8,9 +8,10 @@ from datetime import date
 import psycopg
 from flask import Blueprint, session, request, jsonify, render_template
 
-from auth import login_required
+from auth import (login_required, require_module,
+                  login_blocked, record_login_failure, clear_login_failures, LOGIN_BLOCKED_MSG)
 from config import TW_TZ
-from db import get_db, _hash_pw
+from db import get_db, hash_password, verify_password, is_legacy_hash
 from blueprints.notifications import _notify_review_result
 
 bp = Blueprint('punch', __name__)
@@ -31,7 +32,7 @@ def punch_staff_row(row):
     if not row: return None
     d = dict(row)
     d.pop('password_hash', None)
-    if d.get('password_plain') is None: d['password_plain'] = ''
+    d.pop('password_plain', None)
     if d.get('created_at'): d['created_at'] = d['created_at'].isoformat()
     if d.get('hire_date'):  d['hire_date']  = d['hire_date'].isoformat()
     if d.get('birth_date'): d['birth_date'] = d['birth_date'].isoformat()
@@ -141,12 +142,20 @@ def api_punch_login():
     password = b.get('password', '').strip()
     if not username or not password:
         return jsonify({'error': '請輸入帳號及密碼'}), 400
+    if login_blocked(username):
+        return jsonify({'error': LOGIN_BLOCKED_MSG}), 429
     with get_db() as conn:
         staff = conn.execute(
             "SELECT * FROM punch_staff WHERE username=%s AND active=TRUE", (username,)
         ).fetchone()
-    if not staff or staff['password_hash'] != _hash_pw(password):
+    if not staff or not verify_password(password, staff['password_hash']):
+        record_login_failure(username)
         return jsonify({'error': '帳號或密碼錯誤'}), 401
+    clear_login_failures(username)
+    if is_legacy_hash(staff['password_hash']):
+        with get_db() as conn:
+            conn.execute("UPDATE punch_staff SET password_hash=%s WHERE id=%s",
+                         (hash_password(password), staff['id']))
     session['punch_staff_id']   = staff['id']
     session['punch_staff_name'] = staff['name']
     return jsonify({'id': staff['id'], 'name': staff['name'], 'role': staff['role']})
@@ -192,7 +201,7 @@ def api_punch_settings_get():
 
 
 @bp.route('/api/punch/config', methods=['PUT'])
-@login_required
+@require_module('punch')
 def api_punch_config_update():
     import re as _re
     b = request.get_json(force=True)
@@ -218,7 +227,7 @@ def api_punch_config_update():
 
 
 @bp.route('/api/punch/locations', methods=['GET'])
-@login_required
+@require_module('punch')
 def api_punch_locations_list():
     with get_db() as conn:
         rows = conn.execute("SELECT * FROM punch_locations ORDER BY id").fetchall()
@@ -226,7 +235,7 @@ def api_punch_locations_list():
 
 
 @bp.route('/api/punch/locations', methods=['POST'])
-@login_required
+@require_module('punch')
 def api_punch_locations_create():
     b = request.get_json(force=True)
     name = b.get('location_name', '').strip() or '打卡地點'
@@ -244,7 +253,7 @@ def api_punch_locations_create():
 
 
 @bp.route('/api/punch/locations/<int:lid>', methods=['PUT'])
-@login_required
+@require_module('punch')
 def api_punch_locations_update(lid):
     b = request.get_json(force=True)
     name = b.get('location_name', '').strip() or '打卡地點'
@@ -263,7 +272,7 @@ def api_punch_locations_update(lid):
 
 
 @bp.route('/api/punch/locations/<int:lid>', methods=['DELETE'])
-@login_required
+@require_module('punch')
 def api_punch_locations_delete(lid):
     with get_db() as conn:
         conn.execute("DELETE FROM punch_locations WHERE id=%s", (lid,))
@@ -404,11 +413,22 @@ def api_punch_my_records():
 def api_punch_staff_list():
     with get_db() as conn:
         rows = conn.execute("SELECT * FROM punch_staff ORDER BY sort_order, name").fetchall()
-    return jsonify([punch_staff_row(r) for r in rows])
+    result = [punch_staff_row(r) for r in rows]
+    # 員工下拉選單全後台共用，但薪資/銀行/生日等敏感欄位只給有 punch 或 salary 模組權限的管理員
+    perms = session.get('admin_permissions') or []
+    if not (session.get('admin_is_super') or 'punch' in perms or 'salary' in perms):
+        SENSITIVE = ('base_salary', 'insured_salary', 'hourly_rate', 'daily_hours',
+                     'salary_type', 'ot_rate1', 'ot_rate2', 'ot_rate3', 'vacation_quota',
+                     'bank_code', 'bank_name', 'bank_branch', 'bank_account',
+                     'account_holder', 'birth_date', 'termination_reason')
+        for d in result:
+            for k in SENSITIVE:
+                d.pop(k, None)
+    return jsonify(result)
 
 
 @bp.route('/api/punch/staff/reorder', methods=['POST'])
-@login_required
+@require_module('punch')
 def api_punch_staff_reorder():
     items = request.get_json(force=True) or []
     if not isinstance(items, list):
@@ -423,7 +443,7 @@ def api_punch_staff_reorder():
 
 
 @bp.route('/api/punch/staff', methods=['POST'])
-@login_required
+@require_module('punch')
 def api_punch_staff_create():
     b        = request.get_json(force=True)
     name     = b.get('name', '').strip()
@@ -432,6 +452,7 @@ def api_punch_staff_create():
     if not name:     return jsonify({'error': '姓名為必填'}), 400
     if not username: return jsonify({'error': '帳號為必填'}), 400
     if not password: return jsonify({'error': '請設定密碼'}), 400
+    if len(password) < 8: return jsonify({'error': '密碼至少 8 個字元'}), 400
     employee_code  = (b.get('employee_code') or '').strip() or None
     department     = (b.get('department') or '').strip()
     role           = b.get('role', '').strip()
@@ -446,11 +467,11 @@ def api_punch_staff_create():
         with get_db() as conn:
             row = conn.execute("""
                 INSERT INTO punch_staff
-                  (name, username, password_hash, password_plain, role, position_title, employee_code,
+                  (name, username, password_hash, role, position_title, employee_code,
                    department, hire_date, birth_date,
                    bank_code, bank_name, bank_branch, bank_account, account_holder)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *
-            """, (name, username, _hash_pw(password), password, role, role, employee_code,
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *
+            """, (name, username, hash_password(password), role, role, employee_code,
                   department, hire_date, birth_date,
                   bank_code, bank_name, bank_branch, bank_account, account_holder)).fetchone()
         return jsonify(punch_staff_row(row)), 201
@@ -463,7 +484,7 @@ def api_punch_staff_create():
 
 
 @bp.route('/api/punch/staff/<int:sid>', methods=['PUT'])
-@login_required
+@require_module('punch')
 def api_punch_staff_update(sid):
     b             = request.get_json(force=True)
     name          = b.get('name', '').strip()
@@ -482,15 +503,17 @@ def api_punch_staff_update(sid):
     birth_date     = b.get('birth_date') or None
     if not name or not username:
         return jsonify({'error': '姓名和帳號為必填'}), 400
+    if password and len(password) < 8:
+        return jsonify({'error': '密碼至少 8 個字元'}), 400
     with get_db() as conn:
         if password:
             row = conn.execute("""
                 UPDATE punch_staff
-                SET name=%s,username=%s,password_hash=%s,password_plain=%s,role=%s,position_title=%s,active=%s,employee_code=%s,
+                SET name=%s,username=%s,password_hash=%s,role=%s,position_title=%s,active=%s,employee_code=%s,
                     department=%s,hire_date=%s,birth_date=%s,
                     bank_code=%s,bank_name=%s,bank_branch=%s,bank_account=%s,account_holder=%s
                 WHERE id=%s RETURNING *
-            """, (name, username, _hash_pw(password), password, role, role, active, employee_code,
+            """, (name, username, hash_password(password), role, role, active, employee_code,
                   department, hire_date, birth_date,
                   bank_code, bank_name, bank_branch, bank_account, account_holder, sid)).fetchone()
         else:
@@ -507,7 +530,7 @@ def api_punch_staff_update(sid):
 
 
 @bp.route('/api/punch/staff/<int:sid>', methods=['DELETE'])
-@login_required
+@require_module('punch')
 def api_punch_staff_delete(sid):
     with get_db() as conn:
         conn.execute("DELETE FROM punch_staff WHERE id=%s", (sid,))
@@ -517,7 +540,7 @@ def api_punch_staff_delete(sid):
 # ─── Admin: Punch Records ────────────────────────────────────────────────────
 
 @bp.route('/api/punch/records', methods=['GET'])
-@login_required
+@require_module('punch')
 def api_punch_records():
     staff_id  = request.args.get('staff_id')
     date_from = request.args.get('date_from')
@@ -527,7 +550,7 @@ def api_punch_records():
     conds, params = ["TRUE"], []
     if staff_id: conds.append("pr.staff_id=%s"); params.append(int(staff_id))
     if month:
-        conds.append("TO_CHAR(pr.punched_at,'YYYY-MM')=%s"); params.append(month)
+        conds.append("TO_CHAR(pr.punched_at AT TIME ZONE 'Asia/Taipei','YYYY-MM')=%s"); params.append(month)
     elif date_from:
         conds.append("(pr.punched_at AT TIME ZONE 'Asia/Taipei')::date>=%s"); params.append(date_from)
         if date_to:
@@ -544,7 +567,7 @@ def api_punch_records():
 
 
 @bp.route('/api/punch/records', methods=['POST'])
-@login_required
+@require_module('punch')
 def api_punch_record_manual():
     b          = request.get_json(force=True)
     staff_id   = b.get('staff_id')
@@ -570,7 +593,7 @@ def api_punch_record_manual():
 
 
 @bp.route('/api/punch/records/<int:rid>', methods=['PUT'])
-@login_required
+@require_module('punch')
 def api_punch_record_update(rid):
     b = request.get_json(force=True)
     if b.get('punch_type') not in ('in', 'out', 'break_out', 'break_in'):
@@ -587,7 +610,7 @@ def api_punch_record_update(rid):
 
 
 @bp.route('/api/punch/records/<int:rid>', methods=['DELETE'])
-@login_required
+@require_module('punch')
 def api_punch_record_delete(rid):
     with get_db() as conn:
         pr = conn.execute("SELECT staff_id, punched_at FROM punch_records WHERE id=%s", (rid,)).fetchone()
@@ -604,7 +627,7 @@ def api_punch_record_delete(rid):
 
 
 @bp.route('/api/punch/summary', methods=['GET'])
-@login_required
+@require_module('punch')
 def api_punch_summary():
     month = request.args.get('month') or _dt.now(TW_TZ).strftime('%Y-%m')
     with get_db() as conn:
@@ -665,7 +688,7 @@ def api_punch_summary():
 
 
 @bp.route('/api/attendance/monthly-stats', methods=['GET'])
-@login_required
+@require_module('punch')
 def api_attendance_monthly_stats():
     month = request.args.get('month') or _dt.now(TW_TZ).strftime('%Y-%m')
     with get_db() as conn:
@@ -826,7 +849,7 @@ def api_punch_req_my():
 
 
 @bp.route('/api/punch/requests', methods=['GET'])
-@login_required
+@require_module('punch')
 def api_punch_reqs_list():
     status = request.args.get('status', '')
     month  = request.args.get('month', '')
@@ -844,7 +867,7 @@ def api_punch_reqs_list():
 
 
 @bp.route('/api/punch/requests/<int:rid>', methods=['DELETE'])
-@login_required
+@require_module('punch')
 def api_punch_req_delete(rid):
     with get_db() as conn:
         conn.execute("DELETE FROM punch_requests WHERE id=%s", (rid,))
@@ -852,7 +875,7 @@ def api_punch_req_delete(rid):
 
 
 @bp.route('/api/punch/requests/<int:rid>', methods=['PUT'])
-@login_required
+@require_module('punch')
 def api_punch_req_review(rid):
     b           = request.get_json(force=True)
     action      = b.get('action')
@@ -862,23 +885,32 @@ def api_punch_req_review(rid):
         return jsonify({'error': 'action 必須為 approve 或 reject'}), 400
     new_status = 'approved' if action == 'approve' else 'rejected'
     with get_db() as conn:
+        old = conn.execute("SELECT * FROM punch_requests WHERE id=%s", (rid,)).fetchone()
+        if not old:
+            return ('', 404)
+        old_status = old['status']
         row = conn.execute("""
             UPDATE punch_requests
             SET status=%s, reviewed_by=%s, review_note=%s, reviewed_at=NOW()
             WHERE id=%s RETURNING *
         """, (new_status, reviewed_by, review_note, rid)).fetchone()
-        if not row:
-            return ('', 404)
-        if action == 'approve':
+        # 依 old_status 判斷，避免重複核准重複插入打卡；核准後改駁回要移除已插入的記錄
+        month = (row['requested_at'].astimezone(TW_TZ).strftime('%Y-%m')
+                 if hasattr(row['requested_at'], 'astimezone')
+                 else str(row['requested_at'])[:7])
+        if action == 'approve' and old_status != 'approved':
             conn.execute("""
                 INSERT INTO punch_records
                   (staff_id, punch_type, punched_at, note, is_manual, manual_by)
                 VALUES (%s,%s,%s,%s,TRUE,%s)
             """, (row['staff_id'], row['punch_type'], row['requested_at'],
                   f'補打卡申請 #{rid}', reviewed_by))
-            month = (row['requested_at'].strftime('%Y-%m')
-                     if hasattr(row['requested_at'], 'strftime')
-                     else str(row['requested_at'])[:7])
+        elif action == 'reject' and old_status == 'approved':
+            conn.execute("""
+                DELETE FROM punch_records
+                WHERE staff_id=%s AND is_manual=TRUE AND note=%s
+            """, (row['staff_id'], f'補打卡申請 #{rid}'))
+        if old_status != new_status:
             conn.execute("""
                 DELETE FROM salary_records
                 WHERE staff_id=%s AND month=%s AND status='draft'
@@ -894,7 +926,7 @@ def api_punch_req_review(rid):
 # ─── Staff terminate / reinstate ─────────────────────────────────────────────
 
 @bp.route('/api/punch/staff/<int:sid>/terminate', methods=['POST'])
-@login_required
+@require_module('punch')
 def api_punch_staff_terminate(sid):
     b = request.get_json(force=True) or {}
     terminated_at = b.get('terminated_at') or _dt.now(TW_TZ).strftime('%Y-%m-%d')
@@ -909,7 +941,7 @@ def api_punch_staff_terminate(sid):
 
 
 @bp.route('/api/punch/staff/<int:sid>/reinstate', methods=['POST'])
-@login_required
+@require_module('punch')
 def api_punch_staff_reinstate(sid):
     with get_db() as conn:
         row = conn.execute("""
@@ -921,7 +953,7 @@ def api_punch_staff_reinstate(sid):
 
 
 @bp.route('/api/punch/staff/terminated', methods=['GET'])
-@login_required
+@require_module('punch')
 def api_punch_staff_terminated():
     with get_db() as conn:
         rows = conn.execute("""
@@ -941,7 +973,7 @@ def api_punch_staff_terminated():
 # ─── Batch punch request review ──────────────────────────────────────────────
 
 @bp.route('/api/punch/requests/batch', methods=['POST'])
-@login_required
+@require_module('punch')
 def api_punch_requests_batch():
     b           = request.get_json(force=True)
     ids         = b.get('ids', [])

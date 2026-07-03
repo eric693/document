@@ -20,9 +20,32 @@ def get_db():
 
 
 # ── 密碼雜湊 ──────────────────────────────────────────────────────
+# 新密碼一律用 werkzeug pbkdf2（加鹽）；舊資料為無鹽 SHA-256 hex，
+# verify_password 兩者皆可驗證，登入成功後由呼叫端呼叫 upgrade 換新格式。
+
+from werkzeug.security import generate_password_hash, check_password_hash
+
 
 def _hash_pw(pw: str) -> str:
+    """僅供驗證舊 SHA-256 資料用，勿用於產生新密碼"""
     return hashlib.sha256(pw.encode()).hexdigest()
+
+
+def hash_password(pw: str) -> str:
+    return generate_password_hash(pw)
+
+
+def is_legacy_hash(stored: str) -> bool:
+    return bool(stored) and ':' not in stored
+
+
+def verify_password(pw: str, stored: str) -> bool:
+    if not stored:
+        return False
+    if is_legacy_hash(stored):
+        import hmac as _hmac
+        return _hmac.compare_digest(stored, _hash_pw(pw))
+    return check_password_hash(stored, pw)
 
 
 # ── 完整建表（atomic，不拆分） ────────────────────────────────────
@@ -169,7 +192,6 @@ def init_db():
             id             SERIAL PRIMARY KEY,
             username       TEXT NOT NULL UNIQUE,
             password_hash  TEXT NOT NULL,
-            password_plain TEXT DEFAULT '',
             display_name   TEXT DEFAULT '',
             is_super       BOOLEAN DEFAULT FALSE,
             permissions    JSONB DEFAULT '[]',
@@ -267,8 +289,10 @@ def init_db():
         "ALTER TABLE schedule_requests ADD COLUMN IF NOT EXISTS reviewed_by TEXT DEFAULT ''",
         "ALTER TABLE schedule_requests ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ",
         # admin_accounts
-        "ALTER TABLE admin_accounts ADD COLUMN IF NOT EXISTS password_plain TEXT DEFAULT ''",
         "ALTER TABLE admin_accounts ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ",
+        # 明文密碼欄位一律移除（安全性）
+        "ALTER TABLE admin_accounts DROP COLUMN IF EXISTS password_plain",
+        "ALTER TABLE punch_staff DROP COLUMN IF EXISTS password_plain",
         # leave_requests
         "ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS leave_start_time TEXT",
         "ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS leave_end_time TEXT",
@@ -299,7 +323,7 @@ def init_db():
                 conn.execute(
                     """INSERT INTO admin_accounts (username, password_hash, display_name, is_super)
                        VALUES ('admin', %s, '超級管理員', TRUE)""",
-                    (_hash_pw(ADMIN_PASSWORD),)
+                    (hash_password(ADMIN_PASSWORD),)
                 )
     except Exception as e:
         print(f'[init_db seed admin] {e}')

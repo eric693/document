@@ -1383,7 +1383,7 @@ function showDayDetail(ds) {
         <div style="width:8px;height:8px;border-radius:50%;background:${PCOLOR[r.type]||'#888'};flex-shrink:0"></div>
         <div style="flex:1">
           <div style="font-size:13px;font-weight:600;color:${PCOLOR[r.type]||'var(--text)'}">${PLABEL[r.type]||r.type}</div>
-          ${r.gps_distance!=null?`<div style="font-size:11px;color:var(--muted)">📍 ${r.location_name||''} ${r.gps_distance}m</div>`:''}
+          ${r.gps_distance!=null?`<div style="font-size:11px;color:var(--muted)">📍 ${esc(r.location_name||'')} ${r.gps_distance}m</div>`:''}
           ${r.is_manual?'<div style="font-size:11px;color:var(--accent)">✏️ 補打卡</div>':''}
         </div>
         <div style="font-family:'DM Mono',monospace;font-size:18px;font-weight:700;color:var(--navy)">${r.time}</div>

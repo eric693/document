@@ -4,3 +4,4 @@ __pycache__/
 .env
 .claude/
 app_original_backup.py
+venv/

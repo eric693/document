@@ -5,7 +5,7 @@ from datetime import datetime as _dt
 
 from flask import Blueprint, session, request, jsonify
 
-from auth import login_required
+from auth import login_required, require_module, require_any_module
 from config import TW_TZ
 from db import get_db
 from blueprints.punch import ot_req_row
@@ -99,7 +99,7 @@ def api_ot_submit():
 # ─── Admin endpoints ─────────────────────────────────────────────────────────
 
 @bp.route('/api/overtime/requests', methods=['GET'])
-@login_required
+@require_any_module('punch', 'salary')
 def api_ot_admin_list():
     status = request.args.get('status', '')
     month  = request.args.get('month', '')
@@ -121,7 +121,7 @@ def api_ot_admin_list():
 
 
 @bp.route('/api/overtime/requests/<int:rid>', methods=['PUT'])
-@login_required
+@require_module('punch')
 def api_ot_review(rid):
     b           = request.get_json(force=True)
     action      = b.get('action')
@@ -179,7 +179,7 @@ def api_ot_review(rid):
 
 
 @bp.route('/api/overtime/requests/<int:rid>', methods=['DELETE'])
-@login_required
+@require_module('punch')
 def api_ot_delete(rid):
     with get_db() as conn:
         conn.execute("DELETE FROM overtime_requests WHERE id=%s", (rid,))
@@ -187,7 +187,7 @@ def api_ot_delete(rid):
 
 
 @bp.route('/api/overtime/monthly-summary', methods=['GET'])
-@login_required
+@require_any_module('punch', 'salary')
 def api_ot_monthly_summary():
     month = request.args.get('month', '') or _dt.now(TW_TZ).strftime('%Y-%m')
     with get_db() as conn:
@@ -226,7 +226,7 @@ def api_ot_monthly_summary():
 
 
 @bp.route('/api/overtime/calc-preview', methods=['POST'])
-@login_required
+@require_any_module('punch', 'salary')
 def api_ot_calc_preview():
     b        = request.get_json(force=True)
     staff_id = b.get('staff_id')
@@ -269,7 +269,7 @@ def api_ot_calc_preview():
 # ─── Batch overtime review ───────────────────────────────────────────────────
 
 @bp.route('/api/overtime/requests/batch', methods=['POST'])
-@login_required
+@require_module('punch')
 def api_overtime_requests_batch():
     b           = request.get_json(force=True)
     ids         = b.get('ids', [])
