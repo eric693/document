@@ -577,9 +577,21 @@ def mobile_admin_leaves():
     return jsonify(data)
 
 
+def _mobile_has_module(*mods):
+    u = getattr(g, 'mobile_user', None) or {}
+    if u.get('is_super'):
+        return True
+    perms = u.get('permissions') or []
+    return any(m in perms for m in mods)
+
+
 @bp.route('/api/mobile/admin/leaves/<int:lid>', methods=['PUT'])
 @mobile_admin_required
 def mobile_admin_leave_action(lid):
+    # 與網頁版 api_leave_request_review 同步：需扣/回補假期餘額並重算薪資草稿
+    from blueprints.leave import _update_leave_balance
+    if not _mobile_has_module('leave'):
+        return jsonify({'error': '無「請假管理」模組權限'}), 403
     b = request.get_json(force=True) or {}
     action = b.get('action')
     if action not in ('approve', 'reject'):
@@ -587,10 +599,45 @@ def mobile_admin_leave_action(lid):
     status   = 'approved' if action == 'approve' else 'rejected'
     reviewer = g.mobile_user.get('display_name', g.mobile_user.get('username', ''))
     with get_db() as conn:
+        old = conn.execute("SELECT * FROM leave_requests WHERE id=%s", (lid,)).fetchone()
+        if not old:
+            return jsonify({'error': '找不到假單'}), 404
+        old_status = old['status']
+        lt = conn.execute("SELECT * FROM leave_types WHERE id=%s", (old['leave_type_id'],)).fetchone()
+        delta = float(old['total_days'])
+        if action == 'approve':
+            if lt and lt['require_cert'] and not old.get('document_id'):
+                return jsonify({'error': '此假別需要上傳病單/證明才能核准'}), 422
+            if old_status != 'approved' and lt and lt['max_days'] is not None:
+                year = int(str(old['start_date'])[:4])
+                conn.execute("""
+                    INSERT INTO leave_balances (staff_id, leave_type_id, year, total_days, used_days)
+                    VALUES (%s, %s, %s, 0, 0) ON CONFLICT (staff_id, leave_type_id, year) DO NOTHING
+                """, (old['staff_id'], old['leave_type_id'], year))
+                bal = conn.execute("""
+                    SELECT COALESCE(used_days, 0) as used
+                    FROM leave_balances WHERE staff_id=%s AND leave_type_id=%s AND year=%s
+                    FOR UPDATE
+                """, (old['staff_id'], old['leave_type_id'], year)).fetchone()
+                used = float(bal['used']) if bal else 0.0
+                if used + delta > float(lt['max_days']):
+                    remaining = float(lt['max_days']) - used
+                    return jsonify({'error': f'{lt["name"]}餘額不足（剩 {remaining} 天），無法核准'}), 422
         conn.execute(
-            "UPDATE leave_requests SET status=%s, reviewed_by=%s, reviewed_at=NOW() WHERE id=%s",
+            "UPDATE leave_requests SET status=%s, reviewed_by=%s, reviewed_at=NOW(), updated_at=NOW() WHERE id=%s",
             (status, reviewer, lid)
         )
+        if action == 'approve' and old_status != 'approved':
+            _update_leave_balance(conn, old['staff_id'], old['leave_type_id'],
+                                  str(old['start_date'])[:4], delta)
+        elif action == 'reject' and old_status == 'approved':
+            _update_leave_balance(conn, old['staff_id'], old['leave_type_id'],
+                                  str(old['start_date'])[:4], -delta)
+        if old_status != status:
+            for _m in {str(old['start_date'])[:7], str(old['end_date'])[:7]}:
+                conn.execute(
+                    "DELETE FROM salary_records WHERE staff_id=%s AND month=%s AND status='draft'",
+                    (old['staff_id'], _m))
     return jsonify({'ok': True})
 
 
@@ -621,6 +668,10 @@ def mobile_admin_overtime():
 @bp.route('/api/mobile/admin/overtime/<int:oid>', methods=['PUT'])
 @mobile_admin_required
 def mobile_admin_overtime_action(oid):
+    # 與網頁版 api_ot_review 同步：核准需計算加班費並重算薪資草稿
+    from blueprints.overtime import _calc_ot_pay
+    if not _mobile_has_module('punch'):
+        return jsonify({'error': '無「打卡管理」模組權限'}), 403
     b = request.get_json(force=True) or {}
     action = b.get('action')
     if action not in ('approve', 'reject'):
@@ -628,10 +679,26 @@ def mobile_admin_overtime_action(oid):
     status   = 'approved' if action == 'approve' else 'rejected'
     reviewer = g.mobile_user.get('display_name', g.mobile_user.get('username', ''))
     with get_db() as conn:
+        req = conn.execute("SELECT * FROM overtime_requests WHERE id=%s", (oid,)).fetchone()
+        if not req:
+            return jsonify({'error': '找不到加班申請'}), 404
+        ot_pay_final = 0.0
+        if action == 'approve':
+            staff = conn.execute("""
+                SELECT base_salary, hourly_rate, daily_hours,
+                       ot_rate1, ot_rate2, ot_rate3, salary_type
+                FROM punch_staff WHERE id=%s
+            """, (req['staff_id'],)).fetchone()
+            if staff:
+                dtype = req.get('day_type', 'weekday') or 'weekday'
+                ot_pay_final, _ = _calc_ot_pay(staff, req['ot_hours'] or 0, dtype)
         conn.execute(
-            "UPDATE overtime_requests SET status=%s, reviewed_by=%s, reviewed_at=NOW() WHERE id=%s",
-            (status, reviewer, oid)
+            "UPDATE overtime_requests SET status=%s, reviewed_by=%s, ot_pay=%s, reviewed_at=NOW() WHERE id=%s",
+            (status, reviewer, ot_pay_final, oid)
         )
+        conn.execute(
+            "DELETE FROM salary_records WHERE staff_id=%s AND month=%s AND status='draft'",
+            (req['staff_id'], str(req['request_date'])[:7]))
     return jsonify({'ok': True})
 
 

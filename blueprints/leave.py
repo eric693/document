@@ -387,6 +387,15 @@ def api_leave_request_admin_create():
         lt_row = conn.execute("SELECT require_cert FROM leave_types WHERE id=%s", (leave_type_id,)).fetchone()
         if lt_row and lt_row['require_cert'] and status == 'approved' and not document_id:
             return jsonify({'error': '此假別需要上傳病單/證明才能直接核准'}), 422
+        overlap = conn.execute("""
+            SELECT start_date, end_date FROM leave_requests
+            WHERE staff_id=%s AND status IN ('pending','approved')
+              AND start_date <= %s AND end_date >= %s
+              AND (total_hours IS NULL OR %s)
+            LIMIT 1
+        """, (sid, end_date, start_date, total_hours_req is None)).fetchone()
+        if overlap:
+            return jsonify({'error': f"該期間與現有假單（{overlap['start_date']}～{overlap['end_date']}，待審或已核准）重疊"}), 409
         row = conn.execute("""
             INSERT INTO leave_requests
               (staff_id, leave_type_id, start_date, end_date, start_half, end_half,
@@ -548,6 +557,17 @@ def api_leave_submit():
     with get_db() as conn:
         if document_id and not _cert_owned_by_staff(conn, document_id, sid):
             return jsonify({'error': '附件無效，請重新上傳病單/證明'}), 400
+        # 重疊檢查：整天假與任何重疊申請衝突；時數假只與涵蓋當日的整天假衝突
+        # （同一天可請多筆時數假，如上午 2h + 下午 2h）
+        overlap = conn.execute("""
+            SELECT start_date, end_date FROM leave_requests
+            WHERE staff_id=%s AND status IN ('pending','approved')
+              AND start_date <= %s AND end_date >= %s
+              AND (total_hours IS NULL OR %s)
+            LIMIT 1
+        """, (sid, end_date, start_date, total_hours_req is None)).fetchone()
+        if overlap:
+            return jsonify({'error': f"該期間與現有假單（{overlap['start_date']}～{overlap['end_date']}，待審或已核准）重疊，請先取消原申請"}), 409
         lt = conn.execute("SELECT * FROM leave_types WHERE id=%s", (leave_type_id,)).fetchone()
         if lt and lt['max_days'] is not None:
             year = start_date[:4]

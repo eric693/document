@@ -171,8 +171,16 @@ def api_expense_review(cid):
     with get_db() as conn:
         claim = conn.execute("SELECT * FROM expense_claims WHERE id=%s", (cid,)).fetchone()
         if not claim: return ('', 404)
+        old_status = claim['status']
 
-        if action == 'approve' and b.get('create_finance_record', True):
+        # 核准後改駁回：移除先前同步出去的財務支出，避免留下孤兒記錄
+        if action == 'reject' and old_status == 'approved' and claim.get('finance_record_id'):
+            conn.execute("DELETE FROM finance_records WHERE id=%s", (claim['finance_record_id'],))
+
+        # 重複核准不可重複寫入財務記錄
+        if action == 'approve' and old_status == 'approved':
+            finance_rid = claim.get('finance_record_id')
+        elif action == 'approve' and b.get('create_finance_record', True):
             cat = conn.execute(
                 "SELECT id FROM finance_categories WHERE type='expense' AND active=TRUE ORDER BY sort_order LIMIT 1"
             ).fetchone()
