@@ -2422,6 +2422,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
           <option value="national">國定假日（加班×2）</option>
           <option value="special">例假日（加班×2）</option>
           <option value="makeup">補班日</option>
+          <option value="unpaid">無薪假（不計薪、加班不算假日費率）</option>
         </select>
       </div>
       <div><label class="form-label">備註</label><input class="form-input" id="hm-note" style="width:100%"></div>
@@ -6535,8 +6536,8 @@ async function deleteSalaryItem(id) {
 // 國定假日模組
 // ══════════════════════════════════════════════════════════════
 const WEEKDAY_ZH_H = ['日','一','二','三','四','五','六'];
-const HOLIDAY_TYPE_LABEL = { national:'國定假日', special:'例假日', makeup:'補班日' };
-const HOLIDAY_TYPE_COLOR = { national:'var(--red)', special:'var(--orange)', makeup:'var(--green)' };
+const HOLIDAY_TYPE_LABEL = { national:'國定假日', special:'例假日', makeup:'補班日', unpaid:'無薪假' };
+const HOLIDAY_TYPE_COLOR = { national:'var(--red)', special:'var(--orange)', makeup:'var(--green)', unpaid:'var(--muted)' };
 let holidayList = [];
 
 function initHoliday() {

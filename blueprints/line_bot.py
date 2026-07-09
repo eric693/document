@@ -931,8 +931,10 @@ def _line_submit_overtime(staff, user_id, text):
     # 日期類型與網頁申請同規則，由日期判定（假日加班才拿得到假日費率）
     _req_d = _dot.fromisoformat(date_str)
     with get_db() as conn:
+        # 無薪假日不算假日費率（與網頁申請同規則）
         _is_holiday = conn.execute(
-            "SELECT 1 FROM public_holidays WHERE date=%s", (date_str,)
+            "SELECT 1 FROM public_holidays WHERE date=%s AND holiday_type <> 'unpaid'",
+            (date_str,)
         ).fetchone()
         if _is_holiday:
             day_type = 'holiday'

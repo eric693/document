@@ -79,8 +79,10 @@ def api_ot_submit():
     except ValueError:
         return jsonify({'error': '日期格式錯誤'}), 400
     with get_db() as conn:
+        # 無薪假日不算假日費率（加班照平日/休息日規則計）
         _is_holiday = conn.execute(
-            "SELECT 1 FROM public_holidays WHERE date=%s", (request_date,)
+            "SELECT 1 FROM public_holidays WHERE date=%s AND holiday_type <> 'unpaid'",
+            (request_date,)
         ).fetchone()
     if _is_holiday:
         day_type = 'holiday'
