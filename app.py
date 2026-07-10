@@ -40,6 +40,7 @@ from blueprints.expense      import init_expense_db
 from blueprints.performance  import _init_performance_db
 from blueprints.webauthn     import init_webauthn_db
 from blueprints.dashboard    import init_labor_law_db, start_labor_law_monitor
+from blueprints.documents    import init_documents_db
 
 init_leave_db()
 init_salary_db()
@@ -53,6 +54,7 @@ init_expense_db()
 _init_performance_db()
 init_webauthn_db()
 init_labor_law_db()
+init_documents_db()
 
 # ── 注冊 Blueprints ────────────────────────────────────────────────
 from blueprints.admin         import bp as admin_bp
@@ -73,6 +75,7 @@ from blueprints.mobile        import bp as mobile_bp
 from blueprints.webauthn      import bp as webauthn_bp
 from blueprints.dashboard     import bp as dashboard_bp
 from blueprints.exports       import bp as exports_bp
+from blueprints.documents     import bp as documents_bp
 
 app.register_blueprint(admin_bp)
 app.register_blueprint(punch_bp)
@@ -92,6 +95,7 @@ app.register_blueprint(mobile_bp)
 app.register_blueprint(webauthn_bp)
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(exports_bp)
+app.register_blueprint(documents_bp)
 
 # ── Health check ───────────────────────────────────────────────────
 from flask import jsonify

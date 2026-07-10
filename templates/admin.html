@@ -215,6 +215,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <a href="#" class="nav-item"        id="nav-perf" onclick="showPage('perf',event)">績效考核</a>
     <a href="#" class="nav-item"        id="nav-stores"   onclick="showPage('stores',event)">門市管理</a>
     <a href="#" class="nav-item"        id="nav-training" onclick="showPage('training',event)">教育訓練</a>
+    <a href="#" class="nav-item"        id="nav-docs" onclick="showPage('docs',event)">文件管理<span class="nav-badge" id="badge-docs" style="display:none"></span></a>
     <a href="#" class="nav-item"        id="nav-labor-law" onclick="showPage('labor-law',event)">勞基法通知<span class="nav-badge" id="badge-labor-law" style="display:none"></span></a>
     <a href="#" class="nav-item"        id="nav-adminmgr" onclick="showPage('adminmgr',event)" style="display:none">帳號管理</a>
   </nav>
@@ -1829,6 +1830,61 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
 
   </div><!-- end page-training -->
 
+  <!-- ── 文件管理（員工資料缺件提醒） ── -->
+  <div class="page" id="page-docs" style="display:none">
+
+    <!-- 缺件警示橫幅 -->
+    <div id="docs-alert-bar" style="display:none;background:var(--red-light,#fee2e2);border:1px solid var(--red,#dc2626);border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:13px;color:var(--red,#dc2626);line-height:1.7"></div>
+
+    <!-- Tab bar -->
+    <div class="inv-tab-bar" id="docs-tab-bar">
+      <button class="inv-tab active" onclick="switchDocsTab('matrix')">缺件總覽</button>
+      <button class="inv-tab"        onclick="switchDocsTab('types')">文件項目設定</button>
+    </div>
+
+    <!-- 缺件總覽（員工 × 文件項目矩陣） -->
+    <div id="docs-panel-matrix">
+      <div class="filter-bar" style="margin-bottom:16px;gap:10px;flex-wrap:wrap">
+        <input class="filter-input" id="docs-search" placeholder="搜尋姓名" style="min-width:140px" oninput="renderDocsMatrix()">
+        <select class="filter-input" id="docs-dept" onchange="renderDocsMatrix()" style="min-width:110px"><option value="">全部部門</option></select>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="docs-only-missing" onchange="renderDocsMatrix()"> 只顯示有缺件
+        </label>
+        <span style="flex:1"></span>
+        <button class="btn btn-outline btn-sm" onclick="loadDocsMatrix()">重新整理</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap" id="docs-matrix-wrap" style="overflow-x:auto">
+          <div class="empty-state"><div class="empty-state-text">載入中...</div></div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:10px">
+        點擊格子即可登記收件狀態。✓ 已收　✗ 缺件　免 免附　（灰色 ✓ 為系統依員工資料自動判定）
+      </div>
+    </div>
+
+    <!-- 文件項目設定 -->
+    <div id="docs-panel-types" style="display:none">
+      <div class="filter-bar" style="margin-bottom:16px">
+        <span style="flex:1;font-size:13px;color:var(--muted)">設定需收取的文件／資料項目，「必收」項目缺件才會列入提醒</span>
+        <button class="btn btn-primary btn-sm" onclick="openDocTypeModal()">新增項目</button>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr>
+              <th>排序</th><th>項目名稱</th><th>必收</th><th>自動帶入欄位</th><th>狀態</th><th>操作</th>
+            </tr></thead>
+            <tbody id="docs-types-tbody">
+              <tr><td colspan="6" class="empty-state"><div class="empty-state-text">載入中...</div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end page-docs -->
+
   <!-- ── 勞基法通知 ── -->
   <div class="page" id="page-labor-law" style="display:none">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">
@@ -2165,6 +2221,90 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="document.getElementById('training-modal').style.display='none'">取消</button>
       <button class="btn btn-primary" onclick="saveTrainingRecord()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 文件管理：收件狀態 Modal -->
+<div class="modal-overlay" id="docs-cell-modal" style="display:none">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <span class="modal-title" id="docs-cell-title">登記收件狀態</span>
+      <button class="modal-close" onclick="document.getElementById('docs-cell-modal').style.display='none'">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="dcm-staff-id">
+      <input type="hidden" id="dcm-type-id">
+      <div id="dcm-auto-hint" style="display:none;background:var(--gray-100,#f3f4f6);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--muted);margin-bottom:12px"></div>
+      <div class="form-row">
+        <div>
+          <label class="form-label">狀態 *</label>
+          <select class="form-input" id="dcm-status" style="width:100%">
+            <option value="received">✓ 已收</option>
+            <option value="missing">✗ 缺件</option>
+            <option value="na">免附（不適用）</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">收件日期</label>
+          <input type="date" class="form-input" id="dcm-date" style="width:100%">
+        </div>
+      </div>
+      <div style="margin-bottom:12px">
+        <label class="form-label">內容／文件資料</label>
+        <input class="form-input" id="dcm-content" placeholder="例：電話號碼、帳號、文件字號（選填）" style="width:100%">
+      </div>
+      <div>
+        <label class="form-label">備註</label>
+        <textarea class="form-input" id="dcm-note" rows="2" style="width:100%" placeholder="選填"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:8px">
+      <button class="btn btn-outline btn-sm" id="dcm-clear-btn" style="display:none;margin-right:auto;color:var(--red)" onclick="clearDocCell()">清除記錄（回復自動判定）</button>
+      <button class="btn btn-outline" onclick="document.getElementById('docs-cell-modal').style.display='none'">取消</button>
+      <button class="btn btn-primary" onclick="saveDocCell()">儲存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 文件管理：項目設定 Modal -->
+<div class="modal-overlay" id="docs-type-modal" style="display:none">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <span class="modal-title" id="docs-type-title">新增文件項目</span>
+      <button class="modal-close" onclick="document.getElementById('docs-type-modal').style.display='none'">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="dtm-id">
+      <div style="margin-bottom:12px">
+        <label class="form-label">項目名稱 *</label>
+        <input class="form-input" id="dtm-name" placeholder="例：良民證、體檢表、安檢" style="width:100%">
+      </div>
+      <div class="form-row">
+        <div>
+          <label class="form-label">必收項目</label>
+          <select class="form-input" id="dtm-required" style="width:100%">
+            <option value="1">是（缺件列入提醒）</option>
+            <option value="0">否（僅記錄）</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">狀態</label>
+          <select class="form-input" id="dtm-active" style="width:100%">
+            <option value="1">啟用</option>
+            <option value="0">停用</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="form-label">自動帶入欄位</label>
+        <select class="form-input" id="dtm-field" style="width:100%"><option value="">無（手動登記）</option></select>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">綁定後，員工資料該欄位有值即自動視為「已收」</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="document.getElementById('docs-type-modal').style.display='none'">取消</button>
+      <button class="btn btn-primary" onclick="saveDocType()">儲存</button>
     </div>
   </div>
 </div>
@@ -3101,6 +3241,7 @@ const ALL_MODULES = [
   { key:'perf',           label:'績效考核' },
   { key:'stores',         label:'門市管理' },
   { key:'training',       label:'教育訓練' },
+  { key:'docs',           label:'文件管理' },
 ];
 function hasModule(m) { return ADMIN_IS_SUPER || ADMIN_PERMS.includes(m); }
 
@@ -3946,7 +4087,7 @@ function closeSidebar() {
 function showPage(page, e) {
   if (e) e.preventDefault();
   // 權限檢查（儀表板和帳號管理不受模組限制）
-  const moduleGuard = { punch:'punch', sched:'sched', leave:'leave', salary:'salary', ann:'ann', holiday:'holiday', finance:'finance', 'expense-review':'expense-review', perf:'perf', stores:'stores', training:'training' };
+  const moduleGuard = { punch:'punch', sched:'sched', leave:'leave', salary:'salary', ann:'ann', holiday:'holiday', finance:'finance', 'expense-review':'expense-review', perf:'perf', stores:'stores', training:'training', docs:'docs' };
   if (moduleGuard[page] && !hasModule(moduleGuard[page])) {
     showToast('您沒有此功能的存取權限', 'error'); return;
   }
@@ -3955,10 +4096,10 @@ function showPage(page, e) {
   const navEl = document.getElementById('nav-' + page);
   if (navEl) navEl.classList.add('active');
   setTimeout(refreshBadges, 600);
-  ['dash','punch','sched','leave','salary','ann','holiday','finance','adminmgr','expense-review','perf','stores','training','labor-law'].forEach(p =>
+  ['dash','punch','sched','leave','salary','ann','holiday','finance','adminmgr','expense-review','perf','stores','training','docs','labor-law'].forEach(p =>
     document.getElementById('page-' + p).style.display = p === page ? '' : 'none'
   );
-  const titles = { dash:'儀表板', punch:'員工管理', sched:'排班管理', leave:'請假管理', salary:'薪資管理', ann:'公告管理', holiday:'國定假日', finance:'財務管理', adminmgr:'帳號管理', 'expense-review':'費用審核', perf:'績效考核', stores:'門市管理', training:'教育訓練追蹤', 'labor-law':'勞基法通知' };
+  const titles = { dash:'儀表板', punch:'員工管理', sched:'排班管理', leave:'請假管理', salary:'薪資管理', ann:'公告管理', holiday:'國定假日', finance:'財務管理', adminmgr:'帳號管理', 'expense-review':'費用審核', perf:'績效考核', stores:'門市管理', training:'教育訓練追蹤', docs:'文件管理', 'labor-law':'勞基法通知' };
   document.getElementById('page-title').textContent = titles[page] || page;
   if (page === 'dash')            initDash();
   if (page === 'punch')           initPunch();
@@ -3973,6 +4114,7 @@ function showPage(page, e) {
   if (page === 'perf')            initPerf();
   if (page === 'stores')          loadStores();
   if (page === 'training')        initTraining();
+  if (page === 'docs')            initDocs();
   if (page === 'labor-law')       loadLaborLawUpdates();
 }
 
@@ -6915,7 +7057,7 @@ async function toggleAnnPin(id) {
 
 // ── Badges ────────────────────────────────────────────────────
 async function refreshBadges() {
-  const [punchRq, otRq, schedRq1, schedRq2, leaveRq, expenseRq, laborLawBadge] = await Promise.all([
+  const [punchRq, otRq, schedRq1, schedRq2, leaveRq, expenseRq, laborLawBadge, docsBadge] = await Promise.all([
     api('/api/punch/requests?status=pending',                    {}, true),
     api('/api/overtime/requests?status=pending',                 {}, true),
     api('/api/schedule/admin/requests?status=pending',           {}, true),
@@ -6923,6 +7065,7 @@ async function refreshBadges() {
     api('/api/leave/requests?status=pending',                    {}, true),
     api('/api/expense/claims?status=pending',                    {}, true),
     api('/api/labor-law/badge',                                  {}, true),
+    api('/api/documents/badge',                                  {}, true),
   ]);
 
   const punchRqCnt  = punchRq.ok && Array.isArray(punchRq.data) ? punchRq.data.length : 0;
@@ -6932,6 +7075,7 @@ async function refreshBadges() {
   const leaveCnt    = leaveRq.ok && Array.isArray(leaveRq.data)  ? leaveRq.data.length  : 0;
   const expenseCnt  = expenseRq.ok && Array.isArray(expenseRq.data) ? expenseRq.data.length : 0;
   const laborLawCnt = laborLawBadge.ok && laborLawBadge.data ? (laborLawBadge.data.unread || 0) : 0;
+  const docsCnt     = docsBadge.ok && docsBadge.data ? (docsBadge.data.missing_staff || 0) : 0;
 
   // ── 左側 nav badge（顯示各模組總待審數）──
   setBadge('badge-punch', punchRqCnt + otCnt);   // 打卡管理 = 補打卡 + 加班
@@ -6939,6 +7083,7 @@ async function refreshBadges() {
   setBadge('badge-leave', leaveCnt);              // 請假管理 = 請假申請
   setBadge('badge-expense-review', expenseCnt);   // 費用審核 = 待審費用
   setBadge('badge-labor-law', laborLawCnt);        // 勞基法通知 = 新修正
+  setBadge('badge-docs', docsCnt);                 // 文件管理 = 有缺件的員工數
 
   // ── Tab 內的小 badge（進入頁面後顯示哪個 tab 有待審）──
   setTabDot('tabdot-punchrq', punchRqCnt);
@@ -6968,7 +7113,7 @@ document.addEventListener('DOMContentLoaded', () => { refreshBadges(); setInterv
   if (nameEl && ADMIN_DISPLAY_NAME) nameEl.textContent = ADMIN_DISPLAY_NAME;
 
   // 依權限顯示/隱藏導覽項目
-  const moduleKeys = ['punch','sched','leave','salary','ann','holiday','finance','expense-review','perf','stores','training'];
+  const moduleKeys = ['punch','sched','leave','salary','ann','holiday','finance','expense-review','perf','stores','training','docs'];
   moduleKeys.forEach(m => {
     const el = document.getElementById('nav-' + m);
     if (el && !hasModule(m)) el.style.display = 'none';
@@ -10018,6 +10163,249 @@ async function triggerLaborLawCheck() {
   } else {
     showToast('檢查觸發失敗', 'error');
   }
+}
+
+/* =====================================================================
+   文件管理（員工資料缺件提醒）
+   ===================================================================== */
+let docsMatrixData = { types: [], staff: [] };
+let docsStaffFields = {};
+
+async function initDocs() {
+  switchDocsTab('matrix');
+}
+
+function switchDocsTab(tab) {
+  ['matrix','types'].forEach((t, i) => {
+    document.getElementById('docs-panel-' + t).style.display = t === tab ? '' : 'none';
+  });
+  document.querySelectorAll('#docs-tab-bar .inv-tab').forEach((b, i) =>
+    b.classList.toggle('active', ['matrix','types'][i] === tab));
+  if (tab === 'matrix') loadDocsMatrix();
+  if (tab === 'types')  loadDocTypes();
+}
+
+// ── 缺件總覽矩陣 ──────────────────────────────────────────────
+async function loadDocsMatrix() {
+  const wrap = document.getElementById('docs-matrix-wrap');
+  wrap.innerHTML = '<div class="empty-state"><div class="empty-state-text">載入中...</div></div>';
+  const r = await api('/api/documents/matrix');
+  if (!r.ok) { wrap.innerHTML = '<div style="color:var(--red);padding:20px">載入失敗</div>'; return; }
+  docsMatrixData = r.data;
+  populateDeptSelect('docs-dept', docsMatrixData.staff);
+  renderDocsAlert();
+  renderDocsMatrix();
+}
+
+function renderDocsAlert() {
+  const bar = document.getElementById('docs-alert-bar');
+  const typeById = Object.fromEntries(docsMatrixData.types.map(t => [String(t.id), t]));
+  const missingStaff = docsMatrixData.staff.filter(s => s.missing_count > 0);
+  if (!missingStaff.length) { bar.style.display = 'none'; return; }
+  bar.style.display = '';
+  const detail = missingStaff.slice(0, 8).map(s => {
+    const names = Object.entries(s.items)
+      .filter(([tid, c]) => c.status === 'missing' && typeById[tid] && typeById[tid].required)
+      .map(([tid]) => typeById[tid].name);
+    return `<strong>${escHtml(s.name)}</strong>（${names.map(escHtml).join('、')}）`;
+  }).join('、 ');
+  const more = missingStaff.length > 8 ? ` …等共 ${missingStaff.length} 人` : '';
+  bar.innerHTML = `⚠️ 共 <strong>${missingStaff.length}</strong> 位員工資料缺件：${detail}${more}`;
+}
+
+function renderDocsMatrix() {
+  const wrap = document.getElementById('docs-matrix-wrap');
+  const q    = (document.getElementById('docs-search')?.value || '').toLowerCase();
+  const dept = document.getElementById('docs-dept')?.value || '';
+  const onlyMissing = document.getElementById('docs-only-missing')?.checked;
+
+  const types = docsMatrixData.types;
+  let staff = docsMatrixData.staff;
+  if (q)    staff = staff.filter(s => s.name.toLowerCase().includes(q));
+  if (dept) staff = staff.filter(s => s.department === dept);
+  if (onlyMissing) staff = staff.filter(s => s.missing_count > 0);
+
+  if (!types.length) {
+    wrap.innerHTML = '<div class="empty-state"><div class="empty-state-text">尚未設定文件項目，請先到「文件項目設定」新增</div></div>';
+    return;
+  }
+  if (!staff.length) {
+    wrap.innerHTML = '<div class="empty-state"><div class="empty-state-text">沒有符合條件的員工</div></div>';
+    return;
+  }
+
+  const head = `<tr>
+    <th style="position:sticky;left:0;background:var(--card-bg,#fff);z-index:1;min-width:90px">姓名</th>
+    <th>部門</th>
+    ${types.map(t => `<th style="text-align:center;white-space:nowrap">${escHtml(t.name)}${t.required ? '' : '<span style="font-weight:400;color:var(--muted)"> (選)'+'</span>'}</th>`).join('')}
+    <th style="text-align:center">缺件數</th>
+  </tr>`;
+
+  const body = staff.map(s => {
+    const cells = types.map(t => {
+      const c = s.items[String(t.id)] || { status:'missing', source:'none' };
+      let mark, color, title = '';
+      if (c.status === 'received') {
+        mark = '✓';
+        color = c.source === 'auto' ? 'var(--muted)' : 'var(--green)';
+        title = c.source === 'auto' ? '系統自動判定' : '已收';
+        if (c.content) title += '：' + c.content;
+      } else if (c.status === 'na') {
+        mark = '免'; color = 'var(--muted)'; title = '免附';
+      } else {
+        mark = '✗'; color = 'var(--red)'; title = '缺件';
+      }
+      return `<td style="text-align:center">
+        <span onclick="openDocCellModal(${s.id},${t.id})" title="${escHtml(title)}"
+              style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;font-weight:700;color:${color};background:${c.status==='missing'?'var(--red-light,#fee2e2)':'var(--gray-100,#f3f4f6)'}">${mark}</span>
+      </td>`;
+    }).join('');
+    const mc = s.missing_count > 0
+      ? `<span class="badge badge-warn">${s.missing_count}</span>`
+      : '<span class="badge badge-ok">齊全</span>';
+    return `<tr>
+      <td style="position:sticky;left:0;background:var(--card-bg,#fff);font-weight:600">${escHtml(s.name)}</td>
+      <td style="font-size:12px;color:var(--muted)">${escHtml(s.department || '—')}</td>
+      ${cells}
+      <td style="text-align:center">${mc}</td>
+    </tr>`;
+  }).join('');
+
+  wrap.innerHTML = `<table class="data-table" style="margin:0"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+}
+
+// ── 收件狀態 Modal ────────────────────────────────────────────
+function openDocCellModal(staffId, typeId) {
+  const s = docsMatrixData.staff.find(x => x.id === staffId);
+  const t = docsMatrixData.types.find(x => x.id === typeId);
+  if (!s || !t) return;
+  const c = s.items[String(t.id)] || { status:'missing', source:'none', content:'', note:'', received_date:'' };
+  document.getElementById('dcm-staff-id').value = staffId;
+  document.getElementById('dcm-type-id').value  = typeId;
+  document.getElementById('docs-cell-title').textContent = `${s.name} — ${t.name}`;
+  document.getElementById('dcm-status').value  = c.source === 'manual' ? c.status : (c.status === 'received' ? 'received' : 'missing');
+  document.getElementById('dcm-content').value = c.content || '';
+  document.getElementById('dcm-note').value    = c.note || '';
+  document.getElementById('dcm-date').value    = c.received_date || '';
+  const hint = document.getElementById('dcm-auto-hint');
+  if (c.source === 'auto') {
+    hint.style.display = '';
+    hint.textContent = `目前由系統自動判定為「已收」（依員工資料：${c.content}）。儲存後改為手動記錄。`;
+  } else if (c.source === 'manual' && c.updated_by) {
+    hint.style.display = '';
+    hint.textContent = `最後由 ${c.updated_by} 登記`;
+  } else {
+    hint.style.display = 'none';
+  }
+  document.getElementById('dcm-clear-btn').style.display = c.source === 'manual' ? '' : 'none';
+  document.getElementById('docs-cell-modal').style.display = 'flex';
+}
+
+async function saveDocCell() {
+  const body = {
+    staff_id:      parseInt(document.getElementById('dcm-staff-id').value),
+    doc_type_id:   parseInt(document.getElementById('dcm-type-id').value),
+    status:        document.getElementById('dcm-status').value,
+    content:       document.getElementById('dcm-content').value,
+    note:          document.getElementById('dcm-note').value,
+    received_date: document.getElementById('dcm-date').value || null,
+  };
+  const r = await api('/api/documents/set', { method:'POST', body: JSON.stringify(body) });
+  if (!r.ok) return;
+  document.getElementById('docs-cell-modal').style.display = 'none';
+  showToast('已更新收件狀態', 'success');
+  await loadDocsMatrix();
+  setTimeout(refreshBadges, 500);
+}
+
+async function clearDocCell() {
+  const body = {
+    staff_id:    parseInt(document.getElementById('dcm-staff-id').value),
+    doc_type_id: parseInt(document.getElementById('dcm-type-id').value),
+    status: 'clear',
+  };
+  const r = await api('/api/documents/set', { method:'POST', body: JSON.stringify(body) });
+  if (!r.ok) return;
+  document.getElementById('docs-cell-modal').style.display = 'none';
+  showToast('已清除手動記錄', 'success');
+  await loadDocsMatrix();
+  setTimeout(refreshBadges, 500);
+}
+
+// ── 文件項目設定 ──────────────────────────────────────────────
+async function loadDocTypes() {
+  const tbody = document.getElementById('docs-types-tbody');
+  tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="empty-state-text">載入中...</div></td></tr>';
+  const r = await api('/api/documents/types');
+  if (!r.ok) { tbody.innerHTML = '<tr><td colspan="6" style="color:var(--red)">載入失敗</td></tr>'; return; }
+  docsStaffFields = r.data.staff_fields || {};
+  const types = r.data.types || [];
+  if (!types.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="empty-state-text">尚無項目</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = types.map(t => `<tr>
+    <td style="color:var(--muted)">${t.sort_order}</td>
+    <td style="font-weight:600">${escHtml(t.name)}</td>
+    <td>${t.required ? '<span class="badge badge-warn">必收</span>' : '<span style="font-size:12px;color:var(--muted)">選附</span>'}</td>
+    <td style="font-size:12px;color:var(--muted)">${t.staff_field ? escHtml(docsStaffFields[t.staff_field] || t.staff_field) : '—'}</td>
+    <td>${t.active ? '<span class="badge badge-ok">啟用</span>' : '<span class="badge badge-warn">停用</span>'}</td>
+    <td>
+      <button class="btn btn-sm" onclick='openDocTypeModal(${JSON.stringify(t).replace(/'/g,"&#39;")})'>編輯</button>
+      <button class="btn btn-sm btn-danger" onclick="deleteDocType(${t.id}, '${escHtml(t.name)}')">刪除</button>
+    </td>
+  </tr>`).join('');
+}
+
+async function openDocTypeModal(t) {
+  // 確保欄位選單已載入
+  if (!Object.keys(docsStaffFields).length) {
+    const r = await api('/api/documents/types');
+    if (r.ok) docsStaffFields = r.data.staff_fields || {};
+  }
+  const fieldSel = document.getElementById('dtm-field');
+  fieldSel.innerHTML = '<option value="">無（手動登記）</option>' +
+    Object.entries(docsStaffFields).map(([k, v]) => `<option value="${k}">${escHtml(v)}</option>`).join('');
+  document.getElementById('docs-type-title').textContent = t ? '編輯文件項目' : '新增文件項目';
+  document.getElementById('dtm-id').value       = t ? t.id : '';
+  document.getElementById('dtm-name').value     = t ? t.name : '';
+  document.getElementById('dtm-required').value = t ? (t.required ? '1' : '0') : '1';
+  document.getElementById('dtm-active').value   = t ? (t.active ? '1' : '0') : '1';
+  fieldSel.value = t ? (t.staff_field || '') : '';
+  document.getElementById('docs-type-modal').style.display = 'flex';
+}
+
+async function saveDocType() {
+  const id = document.getElementById('dtm-id').value;
+  const body = {
+    name:        document.getElementById('dtm-name').value.trim(),
+    required:    document.getElementById('dtm-required').value === '1',
+    active:      document.getElementById('dtm-active').value === '1',
+    staff_field: document.getElementById('dtm-field').value,
+  };
+  if (!body.name) { showToast('請輸入項目名稱', 'error'); return; }
+  let r;
+  if (id) {
+    const cur = (await api('/api/documents/types')).data.types.find(x => x.id === parseInt(id));
+    body.sort_order = cur ? cur.sort_order : 0;
+    r = await api(`/api/documents/types/${id}`, { method:'PUT', body: JSON.stringify(body) });
+  } else {
+    r = await api('/api/documents/types', { method:'POST', body: JSON.stringify(body) });
+  }
+  if (!r.ok) return;
+  document.getElementById('docs-type-modal').style.display = 'none';
+  showToast('已儲存', 'success');
+  await loadDocTypes();
+  setTimeout(refreshBadges, 500);
+}
+
+async function deleteDocType(id, name) {
+  if (!confirm(`確定刪除「${name}」？該項目所有員工的收件記錄將一併刪除。`)) return;
+  const r = await api(`/api/documents/types/${id}`, { method:'DELETE' });
+  if (!r.ok) return;
+  showToast('已刪除', 'success');
+  await loadDocTypes();
+  setTimeout(refreshBadges, 500);
 }
 
 // ══════════════════════════════════════════════════════════════
