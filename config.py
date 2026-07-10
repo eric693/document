@@ -25,9 +25,9 @@ ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
 
 # ── WebAuthn ──────────────────────────────────────────────────────
-WEBAUTHN_RP_ID   = os.environ.get('WEBAUTHN_RP_ID',   'yunghsing-punch-system.crownai.ink')
+WEBAUTHN_RP_ID   = os.environ.get('WEBAUTHN_RP_ID',   'document.crownai.ink')
 WEBAUTHN_RP_NAME = '打卡系統'
-WEBAUTHN_ORIGIN  = os.environ.get('WEBAUTHN_ORIGIN',  'https://yunghsing-punch-system.crownai.ink')
+WEBAUTHN_ORIGIN  = os.environ.get('WEBAUTHN_ORIGIN',  'https://document.crownai.ink')
 
 # ── Mobile JWT ────────────────────────────────────────────────────
 MOBILE_JWT_SECRET  = os.environ.get('MOBILE_JWT_SECRET', '')  # fallback = app.secret_key

@@ -203,8 +203,8 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
   </div>
   <nav class="sidebar-nav">
     <div class="nav-label">功能選單</div>
-    <a href="#" class="nav-item"        id="nav-dash"  onclick="showPage('dash',event)">儀表板</a>
-    <a href="#" class="nav-item active" id="nav-punch" onclick="showPage('punch',event)">打卡管理<span class="nav-badge" id="badge-punch" style="display:none"></span></a>
+    <a href="#" class="nav-item active" id="nav-dash"  onclick="showPage('dash',event)">儀表板</a>
+    <a href="#" class="nav-item"        id="nav-punch" onclick="showPage('punch',event)">員工管理<span class="nav-badge" id="badge-punch" style="display:none"></span></a>
     <a href="#" class="nav-item"        id="nav-sched"  onclick="showPage('sched',event)">排班管理<span class="nav-badge" id="badge-sched" style="display:none"></span></a>
     <a href="#" class="nav-item"        id="nav-leave"  onclick="showPage('leave',event)">請假管理<span class="nav-badge" id="badge-leave" style="display:none"></span></a>
     <a href="#" class="nav-item"        id="nav-salary" onclick="showPage('salary',event)">薪資管理</a>
@@ -230,7 +230,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <button class="hamburger" id="hamburger-btn" onclick="openSidebar()" aria-label="選單">
         <span></span><span></span><span></span>
       </button>
-      <span class="topbar-title" id="page-title">打卡管理</span>
+      <span class="topbar-title" id="page-title">儀表板</span>
     </div>
     <div class="topbar-actions">
       <div style="position:relative" id="staff-search-wrap">
@@ -263,7 +263,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       </span>
     </div>
 
-    <div class="stats-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px" id="dash-stat-cards">
+    <div class="stats-row" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px" id="dash-stat-cards"><!-- 薪資卡恢復時改回 repeat(4,1fr) -->
       <div class="stat-card" style="border-left:4px solid var(--green)">
         <div class="stat-label">今日出勤</div>
         <div class="stat-value" id="ds-working">—</div>
@@ -274,7 +274,8 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         <div class="stat-value" id="ds-pending">—</div>
         <div class="stat-sub" id="ds-pending-sub">筆需要處理</div>
       </div>
-      <div class="stat-card" style="border-left:4px solid var(--accent)">
+      <!-- 薪資功能暫時隱藏 -->
+      <div class="stat-card" style="border-left:4px solid var(--accent);display:none">
         <div class="stat-label" id="ds-salary-label">本月薪資總額</div>
         <div class="stat-value" id="ds-salary">—</div>
         <div class="stat-sub" id="ds-salary-sub">已確認 / 全部</div>
@@ -335,8 +336,8 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         </div>
       </div>
 
-      <!-- 本月加班費排行橫條圖 -->
-      <div class="card">
+      <!-- 本月加班費排行橫條圖（薪資功能暫時隱藏） -->
+      <div class="card" style="display:none">
         <div class="card-header">
           <span class="card-title">本月加班費排行</span>
         </div>
@@ -380,8 +381,9 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     </div>
 
     <!-- 近 12 月人事費用趨勢 + 年度請假類型 -->
-    <div style="display:grid;grid-template-columns:3fr 2fr;gap:20px;margin-bottom:20px">
-      <div class="card">
+    <div style="display:grid;grid-template-columns:1fr;gap:20px;margin-bottom:20px"><!-- 薪資卡恢復時改回 3fr 2fr -->
+      <!-- 人事費用趨勢（薪資功能暫時隱藏） -->
+      <div class="card" style="display:none">
         <div class="card-header"><span class="card-title">近 12 個月人事費用趨勢</span></div>
         <div style="padding:16px 20px"><canvas id="chart-labor-cost" height="180"></canvas></div>
       </div>
@@ -411,17 +413,18 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
   <!-- ── 打卡管理 ── -->
   <div class="page" id="page-punch">
     <div class="inv-tab-bar">
-      <button class="inv-tab active" id="punchtab-summary"  onclick="switchPunchTab('summary')">出勤摘要</button>
-      <button class="inv-tab"        id="punchtab-anomaly"  onclick="switchPunchTab('anomaly')">異常告警<span class="tab-badge" id="tabdot-anomaly" style="display:none"></span></button>
-      <button class="inv-tab"        id="punchtab-mstats"   onclick="switchPunchTab('mstats')">月統計</button>
-      <button class="inv-tab"        id="punchtab-records"  onclick="switchPunchTab('records')">打卡記錄</button>
-      <button class="inv-tab"        id="punchtab-manual"   onclick="switchPunchTab('manual')">代補打卡</button>
-      <button class="inv-tab"        id="punchtab-requests" onclick="switchPunchTab('requests')">補打申請<span class="tab-badge" id="tabdot-punchrq" style="display:none"></span></button>
+      <!-- 打卡功能暫時隱藏（display:none），恢復時移除 style 即可 -->
+      <button class="inv-tab" style="display:none" id="punchtab-summary"  onclick="switchPunchTab('summary')">出勤摘要</button>
+      <button class="inv-tab" style="display:none" id="punchtab-anomaly"  onclick="switchPunchTab('anomaly')">異常告警<span class="tab-badge" id="tabdot-anomaly" style="display:none"></span></button>
+      <button class="inv-tab" style="display:none" id="punchtab-mstats"   onclick="switchPunchTab('mstats')">月統計</button>
+      <button class="inv-tab" style="display:none" id="punchtab-records"  onclick="switchPunchTab('records')">打卡記錄</button>
+      <button class="inv-tab" style="display:none" id="punchtab-manual"   onclick="switchPunchTab('manual')">代補打卡</button>
+      <button class="inv-tab" style="display:none" id="punchtab-requests" onclick="switchPunchTab('requests')">補打申請<span class="tab-badge" id="tabdot-punchrq" style="display:none"></span></button>
       <button class="inv-tab"        id="punchtab-overtime" onclick="switchPunchTab('overtime')">加班申請<span class="tab-badge" id="tabdot-overtime" style="display:none"></span></button>
-      <button class="inv-tab"        id="punchtab-staff"    onclick="switchPunchTab('staff')">員工管理</button>
+      <button class="inv-tab active" id="punchtab-staff"    onclick="switchPunchTab('staff')">員工管理</button>
       <button class="inv-tab"        id="punchtab-resigned"  onclick="switchPunchTab('resigned')">離職員工</button>
-      <button class="inv-tab"        id="punchtab-gps"      onclick="switchPunchTab('gps')">GPS 設定</button>
-      <button class="inv-tab"        id="punchtab-line"     onclick="switchPunchTab('line')">LINE 打卡</button>
+      <button class="inv-tab" style="display:none" id="punchtab-gps"      onclick="switchPunchTab('gps')">GPS 設定</button>
+      <button class="inv-tab" style="display:none" id="punchtab-line"     onclick="switchPunchTab('line')">LINE 打卡</button>
     </div>
 
     <!-- 出勤摘要 -->
@@ -3902,13 +3905,7 @@ function staffSearchSelect(staffId) {
   document.getElementById('staff-search-input').value = '';
   closeStaffSearch();
   showPage('punch', null);
-  setTimeout(() => {
-    switchPunchTab('records');
-    setTimeout(() => {
-      const sel = document.getElementById('rec-filter-staff');
-      if (sel) { sel.value = staffId; loadPunchRecords(); }
-    }, 150);
-  }, 150);
+  setTimeout(() => switchPunchTab('staff'), 150);   // 打卡記錄暫時隱藏，改導向員工管理
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -3961,7 +3958,7 @@ function showPage(page, e) {
   ['dash','punch','sched','leave','salary','ann','holiday','finance','adminmgr','expense-review','perf','stores','training','labor-law'].forEach(p =>
     document.getElementById('page-' + p).style.display = p === page ? '' : 'none'
   );
-  const titles = { dash:'儀表板', punch:'打卡管理', sched:'排班管理', leave:'請假管理', salary:'薪資管理', ann:'公告管理', holiday:'國定假日', finance:'財務管理', adminmgr:'帳號管理', 'expense-review':'費用審核', perf:'績效考核', stores:'門市管理', training:'教育訓練追蹤', 'labor-law':'勞基法通知' };
+  const titles = { dash:'儀表板', punch:'員工管理', sched:'排班管理', leave:'請假管理', salary:'薪資管理', ann:'公告管理', holiday:'國定假日', finance:'財務管理', adminmgr:'帳號管理', 'expense-review':'費用審核', perf:'績效考核', stores:'門市管理', training:'教育訓練追蹤', 'labor-law':'勞基法通知' };
   document.getElementById('page-title').textContent = titles[page] || page;
   if (page === 'dash')            initDash();
   if (page === 'punch')           initPunch();
@@ -4005,7 +4002,7 @@ function initPunch() {
   const mstatsEl = document.getElementById('mstats-month');
   if (mstatsEl) mstatsEl.value = ym;
   _restoreFilters('punch-rec', { rec_staff:'rec-filter-staff', rec_month:'rec-filter-month', rec_from:'rec-filter-from', rec_to:'rec-filter-to' });
-  switchPunchTab('summary');
+  switchPunchTab('staff');   // 打卡功能暫時隱藏，預設顯示員工管理
 }
 
 function switchPunchTab(tab) {
@@ -6976,14 +6973,21 @@ document.addEventListener('DOMContentLoaded', () => { refreshBadges(); setInterv
     const el = document.getElementById('nav-' + m);
     if (el && !hasModule(m)) el.style.display = 'none';
   });
+
+  // 暫時隱藏功能（排班/薪資），恢復時清空此陣列即可
+  const HIDDEN_MODULES = ['sched','salary'];
+  HIDDEN_MODULES.forEach(m => {
+    const el = document.getElementById('nav-' + m);
+    if (el) el.style.display = 'none';
+  });
   if (ADMIN_IS_SUPER) {
     const el = document.getElementById('nav-adminmgr');
     if (el) el.style.display = '';
   }
 
-  // 導向第一個有權限的頁面
+  // 導向第一個有權限且未隱藏的頁面
   const firstPage = ADMIN_IS_SUPER ? 'dash'
-    : (ADMIN_PERMS.length ? ADMIN_PERMS[0] : 'dash');
+    : (ADMIN_PERMS.find(p => !HIDDEN_MODULES.includes(p)) || 'dash');
   showPage(firstPage, null);
 })();
 

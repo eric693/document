@@ -184,16 +184,17 @@ html,body{min-height:100%;background:var(--navy);font-family:"Noto Sans TC",sans
         <button class="logout-btn" onclick="doLogout()">登出</button>
       </div>
       <div class="tab-bar">
-        <button class="tab" id="tab-ann" onclick="switchTab('ann')" style="position:relative">
+        <button class="tab active" id="tab-ann" onclick="switchTab('ann')" style="position:relative">
           公告<span id="ann-unread-dot" style="display:none;position:absolute;top:8px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--red)"></span>
         </button>
-        <button class="tab active" id="tab-punch" onclick="switchTab('punch')">打卡</button>
-        <button class="tab"        id="tab-sched"         onclick="switchTab('sched')">排休申請</button>
+        <!-- 打卡／排班／薪資功能暫時隱藏（display:none），恢復時移除 style 即可 -->
+        <button class="tab" style="display:none" id="tab-punch" onclick="switchTab('punch')">打卡</button>
+        <button class="tab" style="display:none" id="tab-sched"         onclick="switchTab('sched')">排休申請</button>
         <button class="tab"        id="tab-leave"         onclick="switchTab('leave')">請假申請</button>
-        <button class="tab"        id="tab-schedule-view" onclick="switchTab('schedule-view')">我的排班</button>
+        <button class="tab" style="display:none" id="tab-schedule-view" onclick="switchTab('schedule-view')">我的排班</button>
         <button class="tab"        id="tab-overtime"      onclick="switchTab('overtime')">加班申請</button>
         <button class="tab"        id="tab-attendance"    onclick="switchTab('attendance')">出勤月曆</button>
-        <button class="tab"        id="tab-payslip"       onclick="switchTab('payslip')">薪資單</button>
+        <button class="tab" style="display:none" id="tab-payslip"       onclick="switchTab('payslip')">薪資單</button>
         <button class="tab"        id="tab-expense"       onclick="switchTab('expense')" style="position:relative">費用報帳<span id="expense-badge" style="display:none;position:absolute;top:6px;right:6px;background:var(--red);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;line-height:16px;text-align:center"></span></button>
         <button class="tab"        id="tab-myperf"        onclick="switchTab('myperf')">我的考核</button>
         <button class="tab"        id="tab-biodev"        onclick="switchTab('biodev')">安全裝置</button>
@@ -610,7 +611,7 @@ function showMain(){
   document.getElementById('screen-main').style.display='';
   document.getElementById('user-name').textContent=me.name;
   document.getElementById('user-role').textContent=me.role||'員工';
-  switchTab('punch');
+  switchTab('ann');   // 打卡功能暫時隱藏，預設顯示公告
 }
 function switchTab(tab){
   ['ann','punch','sched','leave','schedule-view','overtime','attendance','payslip','expense','myperf','biodev'].forEach(t=>{
