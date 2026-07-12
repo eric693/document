@@ -8,7 +8,7 @@ from flask import Blueprint, request, jsonify
 from auth import login_required, require_module
 from config import TW_TZ
 from db import get_db
-from blueprints.export_utils import _xl_workbook, _xl_write_header, _xl_response
+from blueprints.exports import _xl_workbook, _xl_write_header, _xl_response
 
 bp = Blueprint('training', __name__)
 

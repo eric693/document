@@ -393,7 +393,7 @@ def api_perf_config_update():
 @require_module('perf')
 def api_export_performance():
     """匯出績效考核 Excel"""
-    from blueprints.export_utils import _xl_workbook, _xl_write_header, _xl_write_rows, _xl_response
+    from blueprints.exports import _xl_workbook, _xl_write_header, _xl_write_rows, _xl_response
     period   = request.args.get('period', '')
     staff_id = request.args.get('staff_id', '')
 
