@@ -76,6 +76,7 @@ from blueprints.webauthn      import bp as webauthn_bp
 from blueprints.dashboard     import bp as dashboard_bp
 from blueprints.exports       import bp as exports_bp
 from blueprints.documents     import bp as documents_bp
+from blueprints.bulk_io       import bp as bulk_io_bp
 
 app.register_blueprint(admin_bp)
 app.register_blueprint(punch_bp)
@@ -96,6 +97,7 @@ app.register_blueprint(webauthn_bp)
 app.register_blueprint(dashboard_bp)
 app.register_blueprint(exports_bp)
 app.register_blueprint(documents_bp)
+app.register_blueprint(bulk_io_bp)
 
 # ── Health check ───────────────────────────────────────────────────
 from flask import jsonify

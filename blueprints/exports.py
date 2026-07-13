@@ -1162,3 +1162,170 @@ def api_edi_health_enroll():
     fname = f'health_{"enroll" if event_type=="in" else "exit"}_{event_date or "date"}.edi'
     return Response(b'\r\n'.join(lines), mimetype='application/octet-stream',
                     headers={'Content-Disposition': f'attachment; filename={fname}'})
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  補齊各模組 PDF / Excel 匯出（公告、勞基法、財務 PDF、文件 PDF）
+# ══════════════════════════════════════════════════════════════════════════════
+
+_ANN_CAT_ZH = {'general': '一般', 'urgent': '緊急', 'policy': '制度政策', 'labor_law': '勞基法修正'}
+_ANN_PRI_ZH = {'normal': '一般', 'high': '重要', 'urgent': '緊急', 'low': '低'}
+
+
+def _ann_rows(category=''):
+    conds, params = ['TRUE'], []
+    if category:
+        conds.append('category=%s'); params.append(category)
+    with get_db() as conn:
+        return conn.execute(
+            f"SELECT * FROM announcements WHERE {' AND '.join(conds)} "
+            "ORDER BY is_pinned DESC, published_at DESC", params
+        ).fetchall()
+
+
+def _ann_data(rows):
+    data = []
+    for r in rows:
+        pub = r['published_at'].strftime('%Y-%m-%d %H:%M') if r['published_at'] else ''
+        exp = r['expires_at'].strftime('%Y-%m-%d') if r['expires_at'] else ''
+        data.append([
+            r['title'], _ANN_CAT_ZH.get(r['category'], r['category'] or ''),
+            _ANN_PRI_ZH.get(r['priority'], r['priority'] or ''),
+            '是' if r['is_pinned'] else '',
+            '全部' if (r['visible_to'] or 'all') == 'all' else (r['visible_to'] or ''),
+            pub, exp, r['author'] or '', '啟用' if r['active'] else '停用',
+            r['view_count'] or 0,
+        ])
+    return data
+
+
+_ANN_HEADERS = ['標題', '分類', '優先', '置頂', '可見對象', '發布時間', '到期時間', '作者', '狀態', '瀏覽數']
+
+
+@bp.route('/api/export/announcements', methods=['GET'])
+@require_module('ann')
+def api_export_announcements():
+    rows = _ann_rows(request.args.get('category', ''))
+    wb, ws = _xl_workbook('公告清單')
+    widths = [40, 10, 8, 6, 10, 18, 12, 10, 8, 8]
+    _xl_write_header(ws, _ANN_HEADERS, widths)
+    _xl_write_rows(ws, _ann_data(rows), len(_ANN_HEADERS), number_cols={10})
+    return _xl_response(wb, 'announcements.xlsx')
+
+
+@bp.route('/api/export/announcements/pdf', methods=['GET'])
+@require_module('ann')
+def api_export_announcements_pdf():
+    rows = _ann_rows(request.args.get('category', ''))
+    col_widths = [150, 45, 40, 32, 50, 90, 65, 55, 45, 45]
+    buf = _build_pdf('公告清單', f'製表：{_tw_today().isoformat()}  共 {len(rows)} 筆',
+                     _ANN_HEADERS, col_widths, _ann_data(rows), landscape=True)
+    return _pdf_response(buf, 'announcements.pdf')
+
+
+# ─── 勞基法異動 ────────────────────────────────────────────────────────────────
+
+_LABOR_HEADERS = ['修正日期', '說明 / 異動摘要', '公告狀態', '收錄時間', '來源網址']
+
+
+def _labor_rows():
+    with get_db() as conn:
+        return conn.execute(
+            "SELECT * FROM labor_law_updates ORDER BY amend_date DESC LIMIT 500"
+        ).fetchall()
+
+
+def _labor_data(rows):
+    data = []
+    for r in rows:
+        fetched = r['fetched_at'].strftime('%Y-%m-%d %H:%M') if r['fetched_at'] else ''
+        note = (r['version_note'] or r['summary'] or '修正公告')
+        data.append([str(r['amend_date']), note,
+                     '已公告' if r['announced'] else '待公告',
+                     fetched, r['source_url'] or ''])
+    return data
+
+
+@bp.route('/api/export/labor-law', methods=['GET'])
+@login_required
+def api_export_labor_law():
+    rows = _labor_rows()
+    wb, ws = _xl_workbook('勞基法異動')
+    widths = [14, 50, 10, 18, 60]
+    _xl_write_header(ws, _LABOR_HEADERS, widths)
+    _xl_write_rows(ws, _labor_data(rows), len(_LABOR_HEADERS))
+    return _xl_response(wb, 'labor_law_updates.xlsx')
+
+
+@bp.route('/api/export/labor-law/pdf', methods=['GET'])
+@login_required
+def api_export_labor_law_pdf():
+    rows = _labor_rows()
+    col_widths = [70, 260, 55, 95, 220]
+    buf = _build_pdf('勞動基準法異動監控', f'製表：{_tw_today().isoformat()}  共 {len(rows)} 筆',
+                     _LABOR_HEADERS, col_widths, _labor_data(rows), landscape=True)
+    return _pdf_response(buf, 'labor_law_updates.pdf')
+
+
+# ─── 財務 PDF（對應既有 Excel 匯出） ───────────────────────────────────────────
+
+@bp.route('/api/export/finance/pdf', methods=['GET'])
+@require_module('finance')
+def api_export_finance_pdf():
+    month = request.args.get('month', '')
+    conds, params = ['TRUE'], []
+    if month:
+        conds.append("to_char(fr.record_date,'YYYY-MM')=%s"); params.append(month)
+    with get_db() as conn:
+        rows = conn.execute(f"""
+            SELECT fr.record_date, fr.type, fr.title, fr.amount, fr.tax_amount,
+                   fr.vendor, fr.invoice_no, fr.note, fc.name AS category_name
+            FROM finance_records fr
+            LEFT JOIN finance_categories fc ON fc.id=fr.category_id
+            WHERE {' AND '.join(conds)} ORDER BY fr.record_date, fr.id
+        """, params).fetchall()
+    headers = ['日期', '類型', '類別', '標題', '金額', '稅額', '廠商', '單據號碼', '備註']
+    col_widths = [60, 40, 70, 130, 65, 50, 90, 75, 120]
+    total_income = total_expense = 0.0
+    data = []
+    for r in rows:
+        amt = float(r['amount'] or 0); tax = float(r['tax_amount'] or 0)
+        if r['type'] == 'income': total_income += amt
+        else: total_expense += amt
+        data.append([str(r['record_date']), '收入' if r['type'] == 'income' else '支出',
+                     r['category_name'] or '', r['title'], f'{amt:,.0f}',
+                     f'{tax:,.0f}' if tax else '', r['vendor'] or '',
+                     r['invoice_no'] or '', r['note'] or ''])
+    net = total_income - total_expense
+    subtitle = (f'{month or "全部"}　收入 {total_income:,.0f}　支出 {total_expense:,.0f}　'
+                f'淨額 {net:,.0f}　共 {len(data)} 筆')
+    buf = _build_pdf('財務記錄', subtitle, headers, col_widths, data, landscape=True)
+    return _pdf_response(buf, f'finance_{month or "all"}.pdf')
+
+
+# ─── 文件管理缺件矩陣 PDF（對應 bulk Excel 匯出） ──────────────────────────────
+
+@bp.route('/api/export/documents/pdf', methods=['GET'])
+@require_module('docs')
+def api_export_documents_pdf():
+    from blueprints.documents import _build_matrix
+    with get_db() as conn:
+        types, staff_rows = _build_matrix(conn)
+        emp_map = {s['id']: (s['employee_code'] or '')
+                   for s in conn.execute('SELECT id, employee_code FROM punch_staff').fetchall()}
+    headers = ['姓名', '部門'] + [t['name'] for t in types] + ['缺件']
+    id_w = [55, 55]
+    type_w = [26] * len(types)
+    col_widths = id_w + type_w + [32]
+    data = []
+    for s in staff_rows:
+        line = [s['name'], s['department'] or '']
+        for t in types:
+            cell = s['items'].get(str(t['id']), {})
+            st = cell.get('status')
+            line.append('✓' if st == 'received' else ('免' if st == 'na' else '✗'))
+        line.append(str(s['missing_count']) if s['missing_count'] else '')
+        data.append(line)
+    subtitle = f'製表：{_tw_today().isoformat()}  共 {len(data)} 位員工　文件項目 {len(types)} 項'
+    buf = _build_pdf('員工文件收件狀態', subtitle, headers, col_widths, data, landscape=True)
+    return _pdf_response(buf, 'documents_matrix.pdf')

@@ -209,11 +209,11 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <a href="#" class="nav-item"        id="nav-leave"  onclick="showPage('leave',event)">請假管理<span class="nav-badge" id="badge-leave" style="display:none"></span></a>
     <a href="#" class="nav-item"        id="nav-salary" onclick="showPage('salary',event)">薪資管理</a>
     <a href="#" class="nav-item"        id="nav-ann"    onclick="showPage('ann',event)">公告管理</a>
-    <a href="#" class="nav-item"        id="nav-holiday" onclick="showPage('holiday',event)">國定假日</a>
+    <a href="#" class="nav-item"        id="nav-holiday" onclick="showPage('holiday',event)" style="display:none">國定假日</a>
     <a href="#" class="nav-item"        id="nav-finance" onclick="showPage('finance',event)">財務管理</a>
     <a href="#" class="nav-item"        id="nav-expense-review" onclick="showPage('expense-review',event)">費用審核<span class="nav-badge" id="badge-expense-review" style="display:none"></span></a>
     <a href="#" class="nav-item"        id="nav-perf" onclick="showPage('perf',event)">績效考核</a>
-    <a href="#" class="nav-item"        id="nav-stores"   onclick="showPage('stores',event)">門市管理</a>
+    <a href="#" class="nav-item"        id="nav-stores"   onclick="showPage('stores',event)" style="display:none">門市管理</a>
     <a href="#" class="nav-item"        id="nav-training" onclick="showPage('training',event)">教育訓練</a>
     <a href="#" class="nav-item"        id="nav-docs" onclick="showPage('docs',event)">文件管理<span class="nav-badge" id="badge-docs" style="display:none"></span></a>
     <a href="#" class="nav-item"        id="nav-labor-law" onclick="showPage('labor-law',event)">勞基法通知<span class="nav-badge" id="badge-labor-law" style="display:none"></span></a>
@@ -516,6 +516,10 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         </select>
         <span style="flex:1"></span>
         <span id="punch-staff-count" style="font-size:13px;color:var(--muted)"></span>
+        <button class="btn btn-outline btn-sm" onclick="window.open('/api/bulk/staff/template','_blank')" title="下載匯入範本">範本</button>
+        <button class="btn btn-outline btn-sm" onclick="exportStaffExcel()" title="匯出目前員工名單">匯出</button>
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('staff-import-file').click()" title="上傳 Excel 批次匯入">匯入</button>
+        <input type="file" id="staff-import-file" accept=".xlsx" style="display:none" onchange="importStaffExcel(this)">
         <button class="btn btn-primary" onclick="openPunchStaffModal()">新增員工</button>
       </div>
       <div class="card">
@@ -1256,7 +1260,11 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
           <option value="inactive">已下架</option>
         </select>
       </div>
-      <button class="btn btn-primary" onclick="openAnnModal()">＋ 新增公告</button>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-outline btn-sm" onclick="exportAnnExcel()">匯出 Excel</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportAnnPdf()">匯出 PDF</button>
+        <button class="btn btn-primary" onclick="openAnnModal()">＋ 新增公告</button>
+      </div>
     </div>
     <div id="ann-list">
       <div class="empty-state"><div class="empty-state-text">載入中...</div></div>
@@ -1327,7 +1335,8 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         <span class="filter-label">月份</span>
         <input class="filter-input" type="month" id="fin-dash-month" onchange="loadFinSummary()">
         <span style="flex:1"></span>
-        <button class="btn btn-outline btn-sm" onclick="exportFinance()">匯出 CSV</button>
+        <button class="btn btn-outline btn-sm" onclick="exportFinance()">匯出 Excel</button>
+        <button class="btn btn-ghost btn-sm" onclick="exportFinancePdf()">匯出 PDF</button>
       </div>
       <!-- 三欄 KPI -->
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
@@ -1851,6 +1860,11 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
           <input type="checkbox" id="docs-only-missing" onchange="renderDocsMatrix()"> 只顯示有缺件
         </label>
         <span style="flex:1"></span>
+        <button class="btn btn-outline btn-sm" onclick="window.open('/api/bulk/documents/template','_blank')" title="下載矩陣範本（員工已帶入）">範本</button>
+        <button class="btn btn-outline btn-sm" onclick="window.open('/api/bulk/documents/export','_blank')" title="匯出收件狀態矩陣 Excel">匯出 Excel</button>
+        <button class="btn btn-ghost btn-sm" onclick="window.open('/api/export/documents/pdf','_blank')" title="匯出收件狀態矩陣 PDF">匯出 PDF</button>
+        <button class="btn btn-outline btn-sm" onclick="document.getElementById('docs-import-file').click()" title="上傳矩陣批次登記">匯入</button>
+        <input type="file" id="docs-import-file" accept=".xlsx" style="display:none" onchange="importDocsExcel(this)">
         <button class="btn btn-outline btn-sm" onclick="loadDocsMatrix()">重新整理</button>
       </div>
       <div class="card">
@@ -1916,6 +1930,24 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">最後檢查時間</div>
         <div style="font-size:14px;font-weight:600;color:var(--navy);margin-top:6px" id="ll-last-check">—</div>
       </div>
+    </div>
+
+    <!-- 篩選器 -->
+    <div class="filter-bar" style="margin-bottom:16px;gap:10px;flex-wrap:wrap">
+      <span style="font-size:13px;color:var(--muted)">篩選</span>
+      <input class="filter-input" id="ll-search" placeholder="搜尋說明 / 摘要" style="min-width:180px" oninput="renderLaborLawTable()">
+      <select class="filter-input" id="ll-filter-status" onchange="renderLaborLawTable()" style="min-width:120px">
+        <option value="">全部狀態</option>
+        <option value="1">已公告</option>
+        <option value="0">待公告</option>
+      </select>
+      <input class="filter-input" type="date" id="ll-filter-from" onchange="renderLaborLawTable()" title="修正日期起">
+      <span style="font-size:12px;color:var(--muted)">～</span>
+      <input class="filter-input" type="date" id="ll-filter-to" onchange="renderLaborLawTable()" title="修正日期迄">
+      <span id="ll-filter-count" style="font-size:12px;color:var(--muted)"></span>
+      <span style="flex:1"></span>
+      <button class="btn btn-outline btn-sm" onclick="window.open('/api/export/labor-law','_blank')">匯出 Excel</button>
+      <button class="btn btn-ghost btn-sm" onclick="window.open('/api/export/labor-law/pdf','_blank')">匯出 PDF</button>
     </div>
 
     <!-- 修正歷史清單 -->
@@ -7240,6 +7272,18 @@ function exportFinance() {
   const m = document.getElementById('fin-dash-month').value;
   window.open(`/api/finance/export${m?'?month='+m:''}`, '_blank');
 }
+function exportFinancePdf() {
+  const m = document.getElementById('fin-dash-month').value;
+  window.open(`/api/export/finance/pdf${m?'?month='+m:''}`, '_blank');
+}
+function exportAnnExcel() {
+  const cat = document.getElementById('ann-filter-cat')?.value || '';
+  window.open(`/api/export/announcements${cat?'?category='+encodeURIComponent(cat):''}`, '_blank');
+}
+function exportAnnPdf() {
+  const cat = document.getElementById('ann-filter-cat')?.value || '';
+  window.open(`/api/export/announcements/pdf${cat?'?category='+encodeURIComponent(cat):''}`, '_blank');
+}
 
 // ── 收支記錄 ──────────────────────────────────────────────────
 async function loadFinRecords() {
@@ -8267,6 +8311,86 @@ async function importBankCSV(input) {
   showToast(`已匯入 ${data.inserted} 筆交易`, 'success');
   input.value = '';
   loadBankStatements();
+}
+
+/* ── 整批匯入／匯出（員工名單、文件矩陣） ──────────────────────── */
+function showBulkResult(title, bodyHtml) {
+  let ov = document.getElementById('bulk-result-overlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'bulk-result-overlay';
+    ov.className = 'modal-overlay';
+    ov.innerHTML = `<div class="modal" style="max-width:560px">
+      <div class="modal-header"><span class="modal-title" id="bulk-result-title"></span>
+        <button class="modal-close" onclick="document.getElementById('bulk-result-overlay').style.display='none'">&times;</button></div>
+      <div class="modal-body" id="bulk-result-body" style="max-height:60vh;overflow:auto"></div>
+    </div>`;
+    document.body.appendChild(ov);
+  }
+  document.getElementById('bulk-result-title').textContent = title;
+  document.getElementById('bulk-result-body').innerHTML = bodyHtml;
+  ov.style.display = 'flex';
+}
+
+function exportStaffExcel() {
+  const dept   = document.getElementById('ps-dept')?.value || '';
+  const active = document.getElementById('ps-status')?.value || '';
+  const p = new URLSearchParams();
+  if (dept)   p.set('department', dept);
+  if (active) p.set('active', active);
+  window.open('/api/bulk/staff/export?' + p.toString(), '_blank');
+}
+
+async function importStaffExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const fd = new FormData(); fd.append('file', file);
+  showToast('匯入處理中…', 'info');
+  const resp = await fetch('/api/bulk/staff/import', { method:'POST', body:fd });
+  const data = await resp.json().catch(() => ({}));
+  input.value = '';
+  if (!resp.ok) { showToast(data.error || '匯入失敗', 'error'); return; }
+
+  let html = `<div style="font-size:14px;line-height:2">
+    ✅ 新增 <strong>${data.created}</strong> 筆　🔄 更新 <strong>${data.updated}</strong> 筆　⏭ 略過 <strong>${data.skipped}</strong> 筆</div>`;
+  if (data.credentials && data.credentials.length) {
+    html += `<div style="margin-top:14px;font-weight:600;color:var(--navy)">新增員工的登入帳密（請儘速通知員工）</div>
+      <table style="width:100%;font-size:13px;margin-top:6px;border-collapse:collapse">
+        <thead><tr><th style="text-align:left;padding:4px;border-bottom:1px solid var(--border)">姓名</th>
+          <th style="text-align:left;padding:4px;border-bottom:1px solid var(--border)">帳號</th>
+          <th style="text-align:left;padding:4px;border-bottom:1px solid var(--border)">密碼</th></tr></thead><tbody>` +
+      data.credentials.map(c => `<tr><td style="padding:4px">${escStr(c.name)}</td>
+        <td style="padding:4px;font-family:monospace">${escStr(c.username)}</td>
+        <td style="padding:4px;font-family:monospace">${escStr(c.password)}</td></tr>`).join('') +
+      `</tbody></table>`;
+  }
+  if (data.errors && data.errors.length) {
+    html += `<div style="margin-top:14px;font-weight:600;color:var(--red)">略過項目</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8">` +
+      data.errors.map(e => `• ${escStr(e)}`).join('<br>') + `</div>`;
+  }
+  showBulkResult('員工匯入結果', html);
+  if (typeof loadPunchStaff === 'function') loadPunchStaff();
+}
+
+async function importDocsExcel(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const fd = new FormData(); fd.append('file', file);
+  showToast('匯入處理中…', 'info');
+  const resp = await fetch('/api/bulk/documents/import', { method:'POST', body:fd });
+  const data = await resp.json().catch(() => ({}));
+  input.value = '';
+  if (!resp.ok) { showToast(data.error || '匯入失敗', 'error'); return; }
+  let html = `<div style="font-size:14px;line-height:2">
+    比對到 <strong>${data.rows_matched}</strong> 位員工　更新 <strong>${data.updated_cells}</strong> 格　清除 <strong>${data.cleared}</strong> 格</div>`;
+  if (data.errors && data.errors.length) {
+    html += `<div style="margin-top:14px;font-weight:600;color:var(--red)">略過項目</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8">` +
+      data.errors.map(e => `• ${escStr(e)}`).join('<br>') + `</div>`;
+  }
+  showBulkResult('文件狀態匯入結果', html);
+  if (typeof loadDocsMatrix === 'function') loadDocsMatrix();
 }
 
 async function bankAutoMatch() {
@@ -10113,23 +10237,55 @@ async function loadLaborLawUpdates() {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--red)">載入失敗，請重試</td></tr>';
     return;
   }
-  const rows = res.data;
+  laborLawRows = res.data;
 
-  // 更新統計卡
+  // 更新統計卡（統計卡固定顯示全部資料，不受篩選影響）
   const totalEl = document.getElementById('ll-total');
   const latestEl = document.getElementById('ll-latest');
   const lastCheckEl = document.getElementById('ll-last-check');
-  if (totalEl) totalEl.textContent = rows.length;
-  if (latestEl) latestEl.textContent = rows.length > 0 ? rows[0].amend_date : '尚無資料';
-  if (lastCheckEl && rows.length > 0) {
-    const fetchedAt = rows[0].fetched_at ? new Date(rows[0].fetched_at) : null;
+  if (totalEl) totalEl.textContent = laborLawRows.length;
+  if (latestEl) latestEl.textContent = laborLawRows.length > 0 ? laborLawRows[0].amend_date : '尚無資料';
+  if (lastCheckEl && laborLawRows.length > 0) {
+    const fetchedAt = laborLawRows[0].fetched_at ? new Date(laborLawRows[0].fetched_at) : null;
     lastCheckEl.textContent = fetchedAt ? fetchedAt.toLocaleString('zh-TW') : '—';
   } else if (lastCheckEl) {
     lastCheckEl.textContent = '尚未執行';
   }
 
-  if (rows.length === 0) {
+  renderLaborLawTable();
+}
+
+let laborLawRows = [];
+
+function renderLaborLawTable() {
+  const tbody = document.getElementById('labor-law-tbody');
+  if (!tbody) return;
+
+  const kw     = (document.getElementById('ll-search')?.value || '').trim().toLowerCase();
+  const status = document.getElementById('ll-filter-status')?.value || '';
+  const from   = document.getElementById('ll-filter-from')?.value || '';
+  const to     = document.getElementById('ll-filter-to')?.value || '';
+
+  const rows = laborLawRows.filter(r => {
+    if (status !== '' && String(r.announced ? 1 : 0) !== status) return false;
+    if (from && (r.amend_date || '') < from) return false;
+    if (to   && (r.amend_date || '') > to)   return false;
+    if (kw) {
+      const hay = `${r.version_note || ''} ${r.summary || ''} ${r.amend_date || ''}`.toLowerCase();
+      if (!hay.includes(kw)) return false;
+    }
+    return true;
+  });
+
+  const countEl = document.getElementById('ll-filter-count');
+  if (countEl) countEl.textContent = `共 ${rows.length} / ${laborLawRows.length} 筆`;
+
+  if (laborLawRows.length === 0) {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">尚無資料，請點擊「立即檢查更新」</td></tr>';
+    return;
+  }
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">無符合篩選條件的資料</td></tr>';
     return;
   }
 
