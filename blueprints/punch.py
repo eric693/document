@@ -6,6 +6,7 @@ from datetime import datetime as _dt, timezone as _tz, timedelta as _td
 from datetime import date
 
 import psycopg
+from psycopg.types.json import Json
 from flask import Blueprint, session, request, jsonify, render_template
 
 from auth import (login_required, require_module,
@@ -36,6 +37,7 @@ def punch_staff_row(row):
     # 照片以獨立端點提供，避免清單 payload 過大
     d['has_photo'] = bool(d.get('photo_data'))
     d.pop('photo_data', None)
+    d['custom_fields'] = d.get('custom_fields') or {}
     if d.get('created_at'): d['created_at'] = d['created_at'].isoformat()
     if d.get('hire_date'):  d['hire_date']  = d['hire_date'].isoformat()
     if d.get('birth_date'): d['birth_date'] = d['birth_date'].isoformat()
@@ -441,7 +443,9 @@ def api_punch_staff_list():
         SENSITIVE = ('base_salary', 'insured_salary', 'hourly_rate', 'daily_hours',
                      'salary_type', 'ot_rate1', 'ot_rate2', 'ot_rate3', 'vacation_quota',
                      'bank_code', 'bank_name', 'bank_branch', 'bank_account',
-                     'account_holder', 'birth_date', 'termination_reason', 'password_plain')
+                     'account_holder', 'birth_date', 'termination_reason', 'password_plain',
+                     'national_id', 'phone', 'emergency_contact', 'address', 'doc_status',
+                     'custom_fields')
         for d in result:
             for k in SENSITIVE:
                 d.pop(k, None)
@@ -460,6 +464,158 @@ def api_punch_staff_reorder():
                 "UPDATE punch_staff SET sort_order=%s WHERE id=%s",
                 (int(item.get('sort_order', 0)), int(item['id']))
             )
+    return jsonify({'ok': True})
+
+
+# ─── 員工自訂欄位定義 ─────────────────────────────────────────────────────────
+
+def _clean_custom_fields(conn, b):
+    """驗證表單送來的 custom_fields dict，只保留已定義且啟用的欄位。None=未提供"""
+    cf = b.get('custom_fields')
+    if not isinstance(cf, dict):
+        return None
+    valid = {r['name'] for r in conn.execute(
+        "SELECT name FROM staff_field_defs WHERE active=TRUE").fetchall()}
+    return {k: str(v).strip() for k, v in cf.items() if k in valid and len(str(v)) <= 2000}
+
+
+@bp.route('/api/punch/field-defs', methods=['GET'])
+@require_module('punch')
+def api_field_defs_list():
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, name, field_type, sort_order, active FROM staff_field_defs "
+            "ORDER BY sort_order, id").fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@bp.route('/api/punch/field-defs', methods=['POST'])
+@require_module('punch')
+def api_field_defs_create():
+    b = request.get_json(force=True) or {}
+    name = (b.get('name') or '').strip()
+    if not name:
+        return jsonify({'error': '請輸入欄位名稱'}), 400
+    ftype = b.get('field_type') if b.get('field_type') in ('text', 'number', 'date') else 'text'
+    try:
+        with get_db() as conn:
+            mx = conn.execute("SELECT COALESCE(MAX(sort_order),0)+1 AS n FROM staff_field_defs").fetchone()
+            row = conn.execute(
+                "INSERT INTO staff_field_defs (name, field_type, sort_order) VALUES (%s,%s,%s) RETURNING id",
+                (name, ftype, mx['n'])).fetchone()
+        return jsonify({'ok': True, 'id': row['id']})
+    except psycopg.errors.UniqueViolation:
+        return jsonify({'error': '已有同名欄位'}), 400
+
+
+@bp.route('/api/punch/field-defs/<int:fid>', methods=['PUT'])
+@require_module('punch')
+def api_field_defs_update(fid):
+    b = request.get_json(force=True) or {}
+    name = (b.get('name') or '').strip()
+    if not name:
+        return jsonify({'error': '請輸入欄位名稱'}), 400
+    ftype = b.get('field_type') if b.get('field_type') in ('text', 'number', 'date') else 'text'
+    try:
+        with get_db() as conn:
+            old = conn.execute("SELECT name FROM staff_field_defs WHERE id=%s", (fid,)).fetchone()
+            if not old:
+                return jsonify({'error': '欄位不存在'}), 404
+            conn.execute(
+                "UPDATE staff_field_defs SET name=%s, field_type=%s, active=%s WHERE id=%s",
+                (name, ftype, bool(b.get('active', True)), fid))
+            # 改名時同步搬移所有員工的既有值
+            if old['name'] != name:
+                conn.execute("""
+                    UPDATE punch_staff SET custom_fields =
+                      (custom_fields - %s::text) ||
+                      jsonb_build_object(%s::text, custom_fields->(%s::text))
+                    WHERE custom_fields ? %s::text
+                """, (old['name'], name, old['name'], old['name']))
+        return jsonify({'ok': True})
+    except psycopg.errors.UniqueViolation:
+        return jsonify({'error': '已有同名欄位'}), 400
+
+
+@bp.route('/api/punch/field-defs/<int:fid>', methods=['DELETE'])
+@require_module('punch')
+def api_field_defs_delete(fid):
+    with get_db() as conn:
+        old = conn.execute("SELECT name FROM staff_field_defs WHERE id=%s", (fid,)).fetchone()
+        if not old:
+            return jsonify({'error': '欄位不存在'}), 404
+        conn.execute("DELETE FROM staff_field_defs WHERE id=%s", (fid,))
+        # 一併移除所有員工上此欄位的值
+        conn.execute("UPDATE punch_staff SET custom_fields = custom_fields - %s WHERE custom_fields ? %s",
+                     (old['name'], old['name']))
+    return jsonify({'ok': True})
+
+
+# ─── 部門管理 ─────────────────────────────────────────────────────────────────
+
+@bp.route('/api/punch/departments', methods=['GET'])
+@login_required
+def api_departments_list():
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT d.id, d.name, d.active, "
+            "  (SELECT COUNT(*) FROM punch_staff ps WHERE ps.department=d.name AND ps.active=TRUE) AS staff_count "
+            "FROM departments d ORDER BY d.sort_order, d.name").fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@bp.route('/api/punch/departments', methods=['POST'])
+@require_module('punch')
+def api_departments_create():
+    b = request.get_json(force=True) or {}
+    name = (b.get('name') or '').strip()
+    if not name:
+        return jsonify({'error': '請輸入部門名稱'}), 400
+    try:
+        with get_db() as conn:
+            row = conn.execute("INSERT INTO departments (name) VALUES (%s) RETURNING id", (name,)).fetchone()
+        return jsonify({'ok': True, 'id': row['id']})
+    except psycopg.errors.UniqueViolation:
+        return jsonify({'error': '已有同名部門'}), 400
+
+
+@bp.route('/api/punch/departments/<int:did>', methods=['PUT'])
+@require_module('punch')
+def api_departments_update(did):
+    b = request.get_json(force=True) or {}
+    name = (b.get('name') or '').strip()
+    if not name:
+        return jsonify({'error': '請輸入部門名稱'}), 400
+    try:
+        with get_db() as conn:
+            old = conn.execute("SELECT name FROM departments WHERE id=%s", (did,)).fetchone()
+            if not old:
+                return jsonify({'error': '部門不存在'}), 404
+            conn.execute("UPDATE departments SET name=%s WHERE id=%s", (name, did))
+            renamed = 0
+            if old['name'] != name:
+                # 改名同步更新所有員工的部門
+                cur = conn.execute("UPDATE punch_staff SET department=%s WHERE department=%s",
+                                   (name, old['name']))
+                renamed = cur.rowcount
+        return jsonify({'ok': True, 'renamed_staff': renamed})
+    except psycopg.errors.UniqueViolation:
+        return jsonify({'error': '已有同名部門'}), 400
+
+
+@bp.route('/api/punch/departments/<int:did>', methods=['DELETE'])
+@require_module('punch')
+def api_departments_delete(did):
+    with get_db() as conn:
+        old = conn.execute("SELECT name FROM departments WHERE id=%s", (did,)).fetchone()
+        if not old:
+            return jsonify({'error': '部門不存在'}), 404
+        used = conn.execute(
+            "SELECT COUNT(*) AS c FROM punch_staff WHERE department=%s AND active=TRUE",
+            (old['name'],)).fetchone()
+        if used['c'] > 0:
+            return jsonify({'error': f'仍有 {used["c"]} 位在職員工屬於此部門，請先調整員工部門'}), 409
+        conn.execute("DELETE FROM departments WHERE id=%s", (did,))
     return jsonify({'ok': True})
 
 
@@ -546,17 +702,18 @@ def api_punch_staff_create():
     photo             = _clean_photo(b) or ''
     try:
         with get_db() as conn:
+            cf = _clean_custom_fields(conn, b) or {}
             row = conn.execute("""
                 INSERT INTO punch_staff
                   (name, username, password_hash, password_plain, role, position_title, employee_code,
                    department, hire_date, birth_date,
                    bank_code, bank_name, bank_branch, bank_account, account_holder,
-                   company, national_id, phone, emergency_contact, address, photo_data)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *
+                   company, national_id, phone, emergency_contact, address, photo_data, custom_fields)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *
             """, (name, username, hash_password(password), password, role, role, employee_code,
                   department, hire_date, birth_date,
                   bank_code, bank_name, bank_branch, bank_account, account_holder,
-                  company, national_id, phone, emergency_contact, address, photo)).fetchone()
+                  company, national_id, phone, emergency_contact, address, photo, Json(cf))).fetchone()
             _apply_staff_documents(conn, row['id'], b.get('documents'))
         return jsonify(punch_staff_row(row)), 201
     except psycopg.errors.UniqueViolation:
@@ -600,6 +757,10 @@ def api_punch_staff_update(sid):
         if photo is not None:
             extra_sql = ',photo_data=%s'
             extra_vals = [photo]
+        cf = _clean_custom_fields(conn, b)
+        if cf is not None:
+            extra_sql += ',custom_fields=%s'
+            extra_vals.append(Json(cf))
         if password:
             row = conn.execute(f"""
                 UPDATE punch_staff

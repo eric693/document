@@ -19,6 +19,7 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify, session, Response
 
 import psycopg
+from psycopg.types.json import Json
 from auth import require_module
 from db import get_db, hash_password
 
@@ -132,17 +133,28 @@ STAFF_COLUMNS = [
 _STAFF_EXPORT_FIELDS = [c[1] for c in STAFF_COLUMNS if c[1] != 'password']
 
 
-def _staff_wb(rows_data):
+def _active_field_defs(conn):
+    """啟用中的自訂欄位定義（匯入匯出動態欄）"""
+    try:
+        return [dict(r) for r in conn.execute(
+            "SELECT name, field_type FROM staff_field_defs WHERE active=TRUE ORDER BY sort_order, id"
+        ).fetchall()]
+    except Exception:
+        return []
+
+
+def _staff_wb(rows_data, extra_headers=None):
     import openpyxl
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = '員工名單'
-    headers = [c[0] for c in STAFF_COLUMNS]
+    headers = [c[0] for c in STAFF_COLUMNS] + list(extra_headers or [])
     ws.append(headers)
     for r in rows_data:
         ws.append(r)
     _style_header(ws, len(headers))
     widths = [12, 12, 14, 12, 12, 12, 12, 16, 13, 12, 6, 12, 12, 24, 10, 12, 12, 16, 12, 8]
+    widths += [14] * len(extra_headers or [])
     for i, w in enumerate(widths, 1):
         ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
     # 說明分頁
@@ -166,13 +178,16 @@ def _staff_wb(rows_data):
 @bp.route('/api/bulk/staff/template', methods=['GET'])
 @require_module('punch')
 def staff_template():
+    with get_db() as conn:
+        defs = _active_field_defs(conn)
     example = [
         'A001', '王小明', 'wang.ming', '', '門市部', '店員', '永興公司',
         'A123456789', '0912345678', '王大明 0987654321',
         '男', '1990-05-20', '2024-01-05', '台北市信義區…',
         '822', '中國信託', '信義分行', '1234567890123', '王小明', '在職',
-    ]
-    return _xlsx_response(_staff_wb([example]), 'staff_import_template.xlsx')
+    ] + [''] * len(defs)
+    return _xlsx_response(_staff_wb([example], [d['name'] for d in defs]),
+                          'staff_import_template.xlsx')
 
 
 @bp.route('/api/bulk/staff/export', methods=['GET'])
@@ -190,6 +205,7 @@ def staff_export():
             f"SELECT * FROM punch_staff WHERE {' AND '.join(conds)} "
             "ORDER BY department, sort_order, id", params
         ).fetchall()
+        defs = _active_field_defs(conn)
     rows_data = []
     for s in staff:
         row = []
@@ -198,12 +214,12 @@ def staff_export():
                 row.append('')
             elif typ == 'active':
                 row.append('在職' if s['active'] else '離職')
-            elif typ == 'date':
-                row.append(_cell_str(s[field]))
             else:
                 row.append(_cell_str(s[field]))
+        cf = s['custom_fields'] or {}
+        row += [_cell_str(cf.get(d['name'])) for d in defs]
         rows_data.append(row)
-    return _xlsx_response(_staff_wb(rows_data), 'staff_list.xlsx')
+    return _xlsx_response(_staff_wb(rows_data, [d['name'] for d in defs]), 'staff_list.xlsx')
 
 
 def _gen_password():
@@ -237,10 +253,24 @@ def staff_import():
     errors, credentials = [], []
 
     with get_db() as conn:
+        # 自訂欄位：表頭比對啟用中的欄位定義（固定欄位優先）
+        def_names = {d['name'] for d in _active_field_defs(conn)}
+        cf_idx = {}   # 欄位名 -> column index
+        for i, h in enumerate(header):
+            h = h.strip()
+            if h in def_names and h not in zh_to_field:
+                cf_idx[h] = i
+
         for rownum, r in enumerate(rows[1:], start=2):
             def val(field):
                 i = col_idx.get(field)
                 return r[i].strip() if (i is not None and i < len(r)) else ''
+
+            cf = {}
+            for cfname, ci in cf_idx.items():
+                v = r[ci].strip() if ci < len(r) else ''
+                if v != '':
+                    cf[cfname] = v
 
             name = val('name')
             emp  = val('employee_code')
@@ -280,14 +310,20 @@ def staff_import():
             # 每列包在 savepoint，單列失敗不影響其他列
             try:
                 if match:
-                    if not fields:
+                    if not fields and not cf:
                         skipped += 1
                         continue
                     with conn.transaction():
-                        sets = ', '.join(f'{k}=%s' for k in fields)
-                        conn.execute(
-                            f'UPDATE punch_staff SET {sets} WHERE id=%s',
-                            list(fields.values()) + [match['id']])
+                        if fields:
+                            sets = ', '.join(f'{k}=%s' for k in fields)
+                            conn.execute(
+                                f'UPDATE punch_staff SET {sets} WHERE id=%s',
+                                list(fields.values()) + [match['id']])
+                        if cf:
+                            conn.execute(
+                                "UPDATE punch_staff SET custom_fields = "
+                                "COALESCE(custom_fields,'{}'::jsonb) || %s::jsonb WHERE id=%s",
+                                (Json(cf), match['id']))
                     updated += 1
                 else:
                     if not name:
@@ -306,9 +342,9 @@ def staff_import():
                         errors.append(f'第 {rownum} 列：密碼少於 8 碼，已略過')
                         continue
                     fields.pop('active', None)   # 新增預設在職
-                    cols = ['name', 'username', 'password_hash', 'password_plain'] + \
+                    cols = ['name', 'username', 'password_hash', 'password_plain', 'custom_fields'] + \
                            [k for k in fields if k != 'name']
-                    vals = [name, username, hash_password(pw), pw] + \
+                    vals = [name, username, hash_password(pw), pw, Json(cf)] + \
                            [fields[k] for k in fields if k != 'name']
                     placeholders = ','.join(['%s'] * len(cols))
                     with conn.transaction():
@@ -386,7 +422,8 @@ def _doc_matrix_wb(include_status):
         ['   清 或 clear → 清除手動記錄，回復系統自動判定'],
         ['   直接填文字（例如電話號碼）→ 標記為已收並記錄該內容'],
         ['   留空 → 不變更該格狀態'],
-        ['3. 只會處理有對應文件項目的欄位，未知欄位會被忽略。'],
+        ['3. 只會處理「手動登記」的文件欄位；綁定員工資料的欄位（姓名、照片、電話等）'],
+        ['   由員工資料自動判定，匯入時會忽略。未知欄位也會被忽略。'],
     ]:
         note.append(line)
     note.column_dimensions['A'].width = 70
@@ -433,8 +470,11 @@ def documents_import():
 
     header = [h.strip() for h in rows[0]]
     with get_db() as conn:
+        # 僅接受「手動登記」項目；綁定員工欄位的項目由員工資料自動判定，
+        # 匯入時忽略，避免建立手動記錄蓋住自動狀態
         types = conn.execute(
-            'SELECT id, name FROM document_types WHERE active=TRUE').fetchall()
+            "SELECT id, name FROM document_types "
+            "WHERE active=TRUE AND (staff_field='' OR staff_field IS NULL)").fetchall()
         name_to_type = {t['name']: t['id'] for t in types}
 
         # 前 len(_DOC_ID_HEADERS) 欄為身分識別欄，其後才是文件欄位。

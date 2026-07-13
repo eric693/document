@@ -158,7 +158,8 @@ def mobile_me():
             staff = conn.execute(
                 """SELECT id, name, username, role, department, position_title,
                           employee_code, hire_date, birth_date, base_salary,
-                          insured_salary, daily_hours, salary_type, active
+                          insured_salary, daily_hours, salary_type, active,
+                          company, phone, emergency_contact, address
                    FROM punch_staff WHERE id=%s""", (int(u['sub']),)
             ).fetchone()
         if not staff:

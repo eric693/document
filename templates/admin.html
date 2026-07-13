@@ -537,6 +537,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         </select>
         <span style="flex:1"></span>
         <span id="punch-staff-count" style="font-size:13px;color:var(--muted)"></span>
+        <button class="btn btn-ghost btn-sm" onclick="openStaffSettings()" title="管理部門與自訂欄位">⚙ 欄位設定</button>
         <button class="btn btn-outline btn-sm" onclick="window.open('/api/bulk/staff/template','_blank')" title="下載匯入範本">範本</button>
         <button class="btn btn-outline btn-sm" onclick="exportStaffExcel()" title="匯出目前員工名單">匯出</button>
         <button class="btn btn-outline btn-sm" onclick="document.getElementById('staff-import-file').click()" title="上傳 Excel 批次匯入">匯入</button>
@@ -2364,7 +2365,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
           <div class="form-group"><label class="form-label">姓名 *</label><input class="form-input" id="psm-name" placeholder="員工姓名" style="font-family:'Noto Sans TC',sans-serif" oninput="if(!document.getElementById('psm-account-holder').value)document.getElementById('psm-account-holder').value=this.value"></div>
           <div class="form-group"><label class="form-label">員工編號</label><input class="form-input" id="psm-code" placeholder="例：EMP001"></div>
           <div class="form-group"><label class="form-label">公司</label><input class="form-input" id="psm-company" placeholder="例：永興公司" style="font-family:'Noto Sans TC',sans-serif"></div>
-          <div class="form-group"><label class="form-label">部門</label><input class="form-input" id="psm-department" placeholder="例：門市部" style="font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="form-group"><label class="form-label">部門</label><input class="form-input" id="psm-department" placeholder="例：門市部" list="dept-datalist" style="font-family:'Noto Sans TC',sans-serif"><datalist id="dept-datalist"></datalist><div class="fm-note">可選既有部門或直接輸入新部門，篩選器會自動更新</div></div>
           <div class="form-group"><label class="form-label">職稱</label><input class="form-input" id="psm-role" placeholder="例：店員" style="font-family:'Noto Sans TC',sans-serif"></div>
           <div class="form-group"><label class="form-label">在職狀態</label><select class="form-input" id="psm-active"><option value="1">在職</option><option value="0">停用</option></select></div>
           <div class="form-group"><label class="form-label">到職日</label><input class="form-input" type="date" id="psm-hire-date"></div>
@@ -2397,6 +2398,12 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- 自訂欄位 -->
+      <div class="fm-section" id="psm-custom-section" style="display:none">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">自訂欄位</span><span class="line"></span></div>
+        <div class="form-grid" id="psm-custom-grid"></div>
       </div>
 
       <!-- 文件收件 -->
@@ -2435,6 +2442,37 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       </div>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closePunchStaffModal()">取消</button><button class="btn btn-primary" onclick="savePunchStaff()">儲存</button></div>
+  </div>
+</div>
+
+<!-- 員工欄位與部門設定 Modal -->
+<div class="modal-overlay" id="staff-settings-modal" style="display:none">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-header"><span class="modal-title">員工欄位與部門設定</span><button class="modal-close" onclick="closeStaffSettings()">&times;</button></div>
+    <div class="modal-body">
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">部門管理</span><span class="line"></span></div>
+        <div class="fm-note" style="margin:0 0 10px">改名會同步更新所有員工的部門；仍有在職員工的部門無法刪除</div>
+        <div id="ss-dept-list" style="display:flex;flex-direction:column;gap:8px"></div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <input class="form-input" id="ss-dept-new" placeholder="新部門名稱" style="flex:1;font-family:'Noto Sans TC',sans-serif" onkeydown="if(event.key==='Enter')addDepartment()">
+          <button class="btn btn-outline" onclick="addDepartment()">新增部門</button>
+        </div>
+      </div>
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">自訂欄位</span><span class="line"></span></div>
+        <div class="fm-note" style="margin:0 0 10px">新增的欄位會出現在員工表單「自訂欄位」區塊，並自動支援整批匯入匯出。刪除欄位會一併移除所有員工上的該欄位值。</div>
+        <div id="ss-field-list" style="display:flex;flex-direction:column;gap:8px"></div>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <input class="form-input" id="ss-field-new" placeholder="欄位名稱，例：血型、制服尺寸" style="flex:1;font-family:'Noto Sans TC',sans-serif" onkeydown="if(event.key==='Enter')addFieldDef()">
+          <select class="form-input" id="ss-field-type" style="width:100px">
+            <option value="text">文字</option><option value="number">數字</option><option value="date">日期</option>
+          </select>
+          <button class="btn btn-outline" onclick="addFieldDef()">新增欄位</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary" onclick="closeStaffSettings()">完成</button></div>
   </div>
 </div>
 
@@ -4505,6 +4543,14 @@ async function loadPunchStaff() {
   const { ok, data } = await api('/api/punch/staff', {}, true);
   punchStaffList = ok ? data : [];
   populateDeptSelect('ps-dept', punchStaffList);
+  // 載入部門清單與自訂欄位定義
+  const [rDept, rDefs] = await Promise.all([
+    api('/api/punch/departments', {}, true),
+    api('/api/punch/field-defs', {}, true),
+  ]);
+  if (rDept.ok) punchDeptList = rDept.data;
+  if (rDefs.ok) punchFieldDefs = rDefs.data;
+  refreshDeptDatalist();
   renderPunchStaff();
   initStaffDragSort();
   if (!punchDocItems.length) {
@@ -4512,7 +4558,17 @@ async function loadPunchStaff() {
     if (r.ok) punchDocItems = r.data;
   }
 }
+function refreshDeptDatalist() {
+  // 員工表單的部門建議清單 = 部門管理清單 ∪ 員工現有部門
+  const dl = document.getElementById('dept-datalist');
+  if (!dl) return;
+  const names = new Set(punchDeptList.filter(d => d.active).map(d => d.name));
+  punchStaffList.forEach(s => { if (s.department) names.add(s.department); });
+  dl.innerHTML = [...names].sort().map(d => `<option value="${escHtml(d)}">`).join('');
+}
 let punchDocItems = [];   // 文件收件勾選項（文件管理的手動項目）
+let punchDeptList = [];   // 部門管理清單
+let punchFieldDefs = [];  // 員工自訂欄位定義
 let _staffPhotoData = null;  // null=不變更、''=清除、data URI=更新
 function initStaffDragSort() {
   const tb = document.getElementById('punch-staff-tbody');
@@ -4596,6 +4652,22 @@ function openPunchStaffModal(id=null) {
     img.style.display = 'none'; img.src = ''; ph.style.display = ''; clr.style.display = 'none';
   }
   document.getElementById('psm-photo-input').value = '';
+  // 自訂欄位
+  const cfSec = document.getElementById('psm-custom-section');
+  const cfGrid = document.getElementById('psm-custom-grid');
+  const activeDefs = punchFieldDefs.filter(f => f.active);
+  if (activeDefs.length) {
+    const cfVals = (s && s.custom_fields) || {};
+    cfGrid.innerHTML = activeDefs.map(f => {
+      const t = f.field_type === 'number' ? 'number' : (f.field_type === 'date' ? 'date' : 'text');
+      const v = cfVals[f.name] != null ? String(cfVals[f.name]) : '';
+      return `<div class="form-group"><label class="form-label">${escHtml(f.name)}</label>
+        <input class="form-input psm-cf" data-cf-name="${escHtml(f.name)}" type="${t}" value="${escHtml(v)}"${t==='text' ? ` style="font-family:'Noto Sans TC',sans-serif"` : ''}></div>`;
+    }).join('');
+    cfSec.style.display = '';
+  } else {
+    cfGrid.innerHTML = ''; cfSec.style.display = 'none';
+  }
   // 文件收件勾選
   const docWrap = document.getElementById('psm-docs-list');
   if (punchDocItems.length) {
@@ -4646,6 +4718,92 @@ function genStaffPw() {
   let p = ''; for (let i = 0; i < 8; i++) p += a[Math.floor(Math.random() * a.length)];
   const el = document.getElementById('psm-password'); el.value = p; el.focus();
 }
+
+/* ── 員工欄位與部門設定 ─────────────────────────────────────── */
+function openStaffSettings() {
+  renderStaffSettings();
+  document.getElementById('staff-settings-modal').style.display = 'flex';
+}
+async function closeStaffSettings() {
+  document.getElementById('staff-settings-modal').style.display = 'none';
+  await loadPunchStaff();   // 重新載入，讓表單/篩選/datalist 同步
+}
+function renderStaffSettings() {
+  const dWrap = document.getElementById('ss-dept-list');
+  dWrap.innerHTML = punchDeptList.length ? punchDeptList.map(d => `
+    <div style="display:flex;gap:8px;align-items:center">
+      <input class="form-input" value="${escHtml(d.name)}" id="ssd-${d.id}" style="flex:1;font-family:'Noto Sans TC',sans-serif">
+      <span style="font-size:11px;color:var(--muted);white-space:nowrap">${d.staff_count} 人</span>
+      <button class="btn btn-outline btn-sm" onclick="renameDepartment(${d.id})">儲存</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteDepartment(${d.id},'${escHtml(d.name)}')">刪除</button>
+    </div>`).join('') : '<div style="font-size:12px;color:var(--muted)">尚無部門，請在下方新增</div>';
+
+  const fWrap = document.getElementById('ss-field-list');
+  const typeZh = { text: '文字', number: '數字', date: '日期' };
+  fWrap.innerHTML = punchFieldDefs.length ? punchFieldDefs.map(f => `
+    <div style="display:flex;gap:8px;align-items:center">
+      <input class="form-input" value="${escHtml(f.name)}" id="ssf-${f.id}" style="flex:1;font-family:'Noto Sans TC',sans-serif">
+      <select class="form-input" id="ssft-${f.id}" style="width:90px">
+        ${['text','number','date'].map(t => `<option value="${t}"${f.field_type===t?' selected':''}>${typeZh[t]}</option>`).join('')}
+      </select>
+      <label class="fm-check" style="font-size:12px;padding:7px 10px"><input type="checkbox" id="ssfa-${f.id}"${f.active?' checked':''}> 啟用</label>
+      <button class="btn btn-outline btn-sm" onclick="saveFieldDef(${f.id})">儲存</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteFieldDef(${f.id},'${escHtml(f.name)}')">刪除</button>
+    </div>`).join('') : '<div style="font-size:12px;color:var(--muted)">尚無自訂欄位，請在下方新增</div>';
+}
+async function _refreshSettingsData() {
+  const [rDept, rDefs] = await Promise.all([
+    api('/api/punch/departments', {}, true), api('/api/punch/field-defs', {}, true)]);
+  if (rDept.ok) punchDeptList = rDept.data;
+  if (rDefs.ok) punchFieldDefs = rDefs.data;
+  renderStaffSettings(); refreshDeptDatalist();
+}
+async function addDepartment() {
+  const name = document.getElementById('ss-dept-new').value.trim();
+  if (!name) { showToast('請輸入部門名稱', 'error'); return; }
+  const { ok } = await api('/api/punch/departments', apiJSON({ name }));
+  if (!ok) return;
+  document.getElementById('ss-dept-new').value = '';
+  showToast('部門已新增', 'success'); await _refreshSettingsData();
+}
+async function renameDepartment(id) {
+  const name = document.getElementById('ssd-' + id).value.trim();
+  if (!name) { showToast('請輸入部門名稱', 'error'); return; }
+  const { ok, data } = await api(`/api/punch/departments/${id}`, apiPUT({ name }));
+  if (!ok) return;
+  showToast(data.renamed_staff > 0 ? `已更名，${data.renamed_staff} 位員工同步更新` : '已儲存', 'success');
+  await _refreshSettingsData(); await loadPunchStaff();
+}
+async function deleteDepartment(id, name) {
+  if (!confirm(`確定刪除部門「${name}」？`)) return;
+  const { ok } = await api(`/api/punch/departments/${id}`, { method: 'DELETE' });
+  if (!ok) return;
+  showToast('已刪除', 'success'); await _refreshSettingsData();
+}
+async function addFieldDef() {
+  const name = document.getElementById('ss-field-new').value.trim();
+  const field_type = document.getElementById('ss-field-type').value;
+  if (!name) { showToast('請輸入欄位名稱', 'error'); return; }
+  const { ok } = await api('/api/punch/field-defs', apiJSON({ name, field_type }));
+  if (!ok) return;
+  document.getElementById('ss-field-new').value = '';
+  showToast('欄位已新增', 'success'); await _refreshSettingsData();
+}
+async function saveFieldDef(id) {
+  const name = document.getElementById('ssf-' + id).value.trim();
+  const field_type = document.getElementById('ssft-' + id).value;
+  const active = document.getElementById('ssfa-' + id).checked;
+  if (!name) { showToast('請輸入欄位名稱', 'error'); return; }
+  const { ok } = await api(`/api/punch/field-defs/${id}`, apiPUT({ name, field_type, active }));
+  if (!ok) return;
+  showToast('已儲存', 'success'); await _refreshSettingsData();
+}
+async function deleteFieldDef(id, name) {
+  if (!confirm(`確定刪除欄位「${name}」？所有員工上此欄位的資料會一併移除。`)) return;
+  const { ok } = await api(`/api/punch/field-defs/${id}`, { method: 'DELETE' });
+  if (!ok) return;
+  showToast('已刪除', 'success'); await _refreshSettingsData();
+}
 function togglePw(sid) {
   const el = document.getElementById('pw' + sid); if (!el) return;
   const s = punchStaffList.find(x => x.id === sid);
@@ -4659,6 +4817,8 @@ async function savePunchStaff() {
   if (!id && !pw)        { showToast('請設定密碼', 'error'); return; }
   const documents = {};
   document.querySelectorAll('.psm-doc-cb').forEach(cb => { documents[cb.dataset.docName] = cb.checked; });
+  const custom_fields = {};
+  document.querySelectorAll('.psm-cf').forEach(inp => { custom_fields[inp.dataset.cfName] = inp.value.trim(); });
   const body = {
     name:           document.getElementById('psm-name').value.trim(),
     employee_code:  document.getElementById('psm-code').value.trim() || null,
@@ -4680,6 +4840,7 @@ async function savePunchStaff() {
     bank_account:   document.getElementById('psm-bank-account').value.trim(),
     account_holder: document.getElementById('psm-account-holder').value.trim(),
     documents,
+    custom_fields,
   };
   if (_staffPhotoData !== null) body.photo_data = _staffPhotoData;
   if (!body.name)     { showToast('請填寫姓名', 'error'); return; }

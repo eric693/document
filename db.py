@@ -258,6 +258,29 @@ def init_db():
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS company TEXT DEFAULT ''",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS phone TEXT DEFAULT ''",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS emergency_contact TEXT DEFAULT ''",
+        # 員工自訂欄位（管理員自行新增的欄位，值存 JSONB {欄位名: 值}）
+        "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS custom_fields JSONB DEFAULT '{}'::jsonb",
+        """CREATE TABLE IF NOT EXISTS staff_field_defs (
+            id         SERIAL PRIMARY KEY,
+            name       TEXT NOT NULL UNIQUE,
+            field_type TEXT DEFAULT 'text',
+            sort_order INT DEFAULT 0,
+            active     BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )""",
+        # 部門管理清單（首次建立時由現有員工部門自動 seed）
+        """CREATE TABLE IF NOT EXISTS departments (
+            id         SERIAL PRIMARY KEY,
+            name       TEXT NOT NULL UNIQUE,
+            sort_order INT DEFAULT 0,
+            active     BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )""",
+        """INSERT INTO departments (name)
+           SELECT DISTINCT department FROM punch_staff
+           WHERE department IS NOT NULL AND department != ''
+             AND NOT EXISTS (SELECT 1 FROM departments)
+           ON CONFLICT (name) DO NOTHING""",
         "ALTER TABLE shift_types ADD COLUMN IF NOT EXISTS departments TEXT DEFAULT ''",
         # punch_config — 固定上下班時間（無排班公司用，批次補登等功能的依據）
         "ALTER TABLE punch_config ADD COLUMN IF NOT EXISTS work_start_time TEXT DEFAULT '08:00'",
