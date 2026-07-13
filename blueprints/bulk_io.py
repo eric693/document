@@ -22,6 +22,7 @@ import psycopg
 from psycopg.types.json import Json
 from auth import require_module
 from db import get_db, hash_password
+from blueprints.audit import log_action
 
 bp = Blueprint('bulk_io', __name__)
 
@@ -201,8 +202,12 @@ def staff_export():
     if dept:
         conds.append('department=%s'); params.append(dept)
     with get_db() as conn:
+        # 只取匯出需要的欄位（排除照片等大欄位）
         staff = conn.execute(
-            f"SELECT * FROM punch_staff WHERE {' AND '.join(conds)} "
+            "SELECT employee_code, name, username, department, position_title, company, "
+            "national_id, phone, emergency_contact, gender, birth_date, hire_date, address, "
+            "bank_code, bank_name, bank_branch, bank_account, account_holder, active, custom_fields "
+            f"FROM punch_staff WHERE {' AND '.join(conds)} "
             "ORDER BY department, sort_order, id", params
         ).fetchall()
         defs = _active_field_defs(conn)
@@ -249,8 +254,10 @@ def staff_import():
     if 'name' not in col_idx:
         return jsonify({'error': '找不到「姓名」欄位，請使用下載的範本格式'}), 400
 
+    preview = request.args.get('preview') == '1'
     created = updated = skipped = 0
     errors, credentials = [], []
+    plan_creates, plan_updates = [], []
 
     with get_db() as conn:
         # 自訂欄位：表頭比對啟用中的欄位定義（固定欄位優先）
@@ -313,6 +320,24 @@ def staff_import():
                     if not fields and not cf:
                         skipped += 1
                         continue
+                    if preview:
+                        changes = {}
+                        for k, v in fields.items():
+                            cur = match.get(k)
+                            cur_s = ('在職' if cur else '離職') if k == 'active' else _cell_str(cur)
+                            new_s = ('在職' if v else '離職') if k == 'active' else str(v)
+                            if cur_s != new_s:
+                                changes[k] = [cur_s, new_s]
+                        mcf = match.get('custom_fields') or {}
+                        for k, v in cf.items():
+                            if str(mcf.get(k, '')) != v:
+                                changes[k] = [str(mcf.get(k, '')), v]
+                        if changes:
+                            plan_updates.append({'name': match['name'], 'changes': changes})
+                            updated += 1
+                        else:
+                            skipped += 1
+                        continue
                     with conn.transaction():
                         if fields:
                             sets = ', '.join(f'{k}=%s' for k in fields)
@@ -342,6 +367,11 @@ def staff_import():
                         errors.append(f'第 {rownum} 列：密碼少於 8 碼，已略過')
                         continue
                     fields.pop('active', None)   # 新增預設在職
+                    if preview:
+                        plan_creates.append({'name': name, 'username': username,
+                                             'auto_password': gen})
+                        created += 1
+                        continue
                     cols = ['name', 'username', 'password_hash', 'password_plain', 'custom_fields'] + \
                            [k for k in fields if k != 'name']
                     vals = [name, username, hash_password(pw), pw, Json(cf)] + \
@@ -359,6 +389,12 @@ def staff_import():
             except Exception as e:
                 errors.append(f'第 {rownum} 列：{name} 匯入失敗（{e}）')
 
+    if preview:
+        return jsonify({
+            'preview': True, 'created': created, 'updated': updated, 'skipped': skipped,
+            'errors': errors, 'creates': plan_creates, 'updates': plan_updates,
+        })
+    log_action('整批匯入員工', '', f'新增 {created}、更新 {updated}、略過 {skipped}、錯誤 {len(errors)}')
     return jsonify({
         'created': created, 'updated': updated, 'skipped': skipped,
         'errors': errors, 'credentials': credentials,
@@ -548,6 +584,7 @@ def documents_import():
             updated_cells += row_updates
             cleared += row_clears
 
+    log_action('整批匯入文件狀態', '', f'{rows_matched} 位員工、更新 {updated_cells} 格')
     return jsonify({
         'rows_matched': rows_matched, 'updated_cells': updated_cells,
         'cleared': cleared, 'errors': errors,

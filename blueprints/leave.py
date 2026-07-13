@@ -9,6 +9,7 @@ from auth import require_module
 from config import TW_TZ
 from db import get_db
 from blueprints.notifications import _notify_review_result
+from blueprints.audit import log_action
 
 bp = Blueprint('leave', __name__)
 
@@ -485,6 +486,7 @@ def api_leave_request_review(rid):
         extra = f"{str(old['start_date'])} ~ {str(old['end_date'])} 共 {duration_str}"
         if review_note: extra += f"\n審核意見：{review_note}"
         _notify_review_result(old['staff_id'], '請假申請', action, extra)
+        log_action('審核請假', f"申請 #{rid}", '核准' if action == 'approve' else '退回')
     return jsonify(leave_req_row(row)) if row else ('', 404)
 
 
@@ -832,6 +834,27 @@ def api_document_image(doc_id):
     from flask import Response
     from html import escape as _esc
     data = str(doc['image_data'])
+    want_download = request.args.get('download') == '1'
+
+    # ?download=1：任何類型都解回原始 bytes 以附件下載（保留原始檔名）
+    if want_download and data.startswith('data:'):
+        import base64 as _b64d
+        from urllib.parse import quote as _q
+        try:
+            header, b64 = data.split(',', 1)
+            mime = header.split(':', 1)[1].split(';', 1)[0] or 'application/octet-stream'
+            raw = _b64d.b64decode(b64)
+        except Exception:
+            return jsonify({'error': '附件資料損毀'}), 500
+        # 決定下載檔名：原始檔名優先，無則依 MIME 給副檔名
+        ext_map = {'application/pdf': '.pdf', 'image/jpeg': '.jpg', 'image/png': '.png',
+                   'image/gif': '.gif', 'image/webp': '.webp'}
+        fname = (doc['filename'] or '').strip() or f'document_{doc_id}{ext_map.get(mime, "")}'
+        # RFC 5987：UTF-8 檔名（中文可用），另附 ASCII fallback
+        ascii_name = ''.join(ch if ch.isascii() and ch not in '\\"' else '_' for ch in fname) or 'document'
+        return Response(raw, mimetype=mime, headers={
+            'Content-Disposition': f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{_q(fname)}"
+        })
 
     # PDF：解回原始 bytes，交給瀏覽器內建 PDF viewer 開啟
     if data.startswith('data:application/pdf'):
@@ -848,9 +871,16 @@ def api_document_image(doc_id):
     html = (
         '<!doctype html><html><head><meta charset="utf-8">'
         f'<title>{fname}</title>'
-        '<style>body{margin:0;background:#111;display:flex;justify-content:center;align-items:flex-start}'
-        'img{max-width:100%;height:auto}</style></head>'
-        f'<body><img src="{src}" alt="{fname}"></body></html>'
+        '<style>body{margin:0;background:#111;display:flex;justify-content:center;align-items:flex-start;padding-top:52px}'
+        'img{max-width:100%;height:auto}'
+        '.bar{position:fixed;top:0;left:0;right:0;height:44px;background:rgba(20,25,40,.92);display:flex;'
+        'align-items:center;justify-content:space-between;padding:0 16px;font:13px "Noto Sans TC",sans-serif}'
+        '.bar span{color:rgba(255,255,255,.75);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+        '.bar a{color:#fff;background:#4a7bda;padding:6px 16px;border-radius:6px;text-decoration:none;flex-shrink:0;margin-left:12px}'
+        '</style></head>'
+        f'<body><div class="bar"><span>{fname}</span>'
+        f'<a href="/api/documents/{doc_id}/image?download=1">⬇ 下載</a></div>'
+        f'<img src="{src}" alt="{fname}"></body></html>'
     )
     return Response(html, mimetype='text/html')
 

@@ -547,11 +547,12 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <div class="card">
         <div class="table-wrap">
           <table>
-            <thead><tr><th style="width:32px"></th><th>姓名</th><th>員工編號</th><th>部門/職稱</th><th>帳號</th><th>密碼</th><th>匯款帳號</th><th>狀態</th><th>操作</th></tr></thead>
-            <tbody id="punch-staff-tbody"><tr><td colspan="9" class="empty-state"><div class="empty-state-text">載入中...</div></td></tr></tbody>
+            <thead><tr><th style="width:32px"></th><th style="width:44px">照片</th><th>姓名</th><th>員工編號</th><th>部門/職稱</th><th>帳號</th><th>密碼</th><th>匯款帳號</th><th>狀態</th><th>操作</th></tr></thead>
+            <tbody id="punch-staff-tbody"><tr><td colspan="10" class="empty-state"><div class="empty-state-text">載入中...</div></td></tr></tbody>
           </table>
         </div>
       </div>
+      <div id="ps-pagination" style="display:flex;justify-content:center;align-items:center;gap:10px;margin-top:14px"></div>
     </div>
 
     <!-- 補打申請 -->
@@ -1730,6 +1731,23 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         </table>
       </div>
     </div>
+
+    <!-- 操作紀錄 -->
+    <div class="card" style="margin-top:20px">
+      <div class="card-header">
+        <span class="card-title">操作紀錄</span>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="filter-input" id="audit-search" placeholder="搜尋操作 / 對象 / 人員" style="min-width:180px" onkeydown="if(event.key==='Enter')loadAuditLogs()">
+          <button class="btn btn-outline btn-sm" onclick="loadAuditLogs()">查詢</button>
+        </div>
+      </div>
+      <div class="table-wrap" style="max-height:420px;overflow-y:auto">
+        <table>
+          <thead><tr><th style="width:150px">時間</th><th>操作人</th><th>操作</th><th>對象</th><th>詳細</th><th>IP</th></tr></thead>
+          <tbody id="audit-tbody"><tr><td colspan="6" class="empty-state"><div class="empty-state-text">載入中...</div></td></tr></tbody>
+        </table>
+      </div>
+    </div>
   </div><!-- end page-adminmgr -->
 
   <!-- ── 門市管理 ── -->
@@ -1887,6 +1905,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         <button class="btn btn-ghost btn-sm" onclick="window.open('/api/export/documents/pdf','_blank')" title="匯出收件狀態矩陣 PDF">匯出 PDF</button>
         <button class="btn btn-outline btn-sm" onclick="document.getElementById('docs-import-file').click()" title="上傳矩陣批次登記">匯入</button>
         <input type="file" id="docs-import-file" accept=".xlsx" style="display:none" onchange="importDocsExcel(this)">
+        <button class="btn btn-outline btn-sm" onclick="sendDocReminders()" title="LINE 推播提醒缺件員工（每週一 09:00 也會自動發送）">📢 發送缺件提醒</button>
         <button class="btn btn-outline btn-sm" onclick="loadDocsMatrix()">重新整理</button>
       </div>
       <div class="card">
@@ -2281,6 +2300,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
             </select>
           </div>
           <div class="form-group"><label class="form-label">收件日期</label><input type="date" class="form-input" id="dcm-date"></div>
+          <div class="form-group"><label class="form-label">到期日（選填）</label><input type="date" class="form-input" id="dcm-expiry"><div class="fm-note">體檢表等有效期文件，到期前 30 天矩陣會顯示警示</div></div>
           <div class="form-group full-width"><label class="form-label">內容／文件資料</label><input class="form-input" id="dcm-content" placeholder="例：電話號碼、帳號、文件字號（選填）"></div>
           <div class="form-group full-width"><label class="form-label">備註</label><input class="form-input" id="dcm-note" placeholder="選填"></div>
         </div>
@@ -2779,7 +2799,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         </div>
         <input type="hidden" id="lam-doc-id">
         <div id="lam-cert-preview" style="display:none;margin-bottom:8px">
-          <a id="lam-cert-link" href="#" target="_blank" style="font-size:12px;color:var(--accent)">查看已上傳病單</a>
+          <a id="lam-cert-link" href="#" target="_blank" style="font-size:12px;color:var(--accent)">查看已上傳病單</a> <a id="lam-cert-dl" href="#" style="font-size:12px;color:var(--muted);margin-left:6px">⬇ 下載</a>
           <button type="button" class="btn btn-outline btn-sm" style="margin-left:8px;font-size:11px" onclick="lamClearCert()">重新上傳</button>
         </div>
         <div id="lam-upload-area">
@@ -2811,7 +2831,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <input type="hidden" id="lrm-id">
       <div id="lrm-info" style="padding:12px;background:var(--bg);border-radius:8px;margin-bottom:14px;font-size:13px"></div>
       <div id="lrm-cert-section" style="display:none;margin-bottom:12px">
-        <a id="lrm-cert-link" href="#" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none">查看病單</a>
+        <a id="lrm-cert-link" href="#" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none">查看病單</a> <a id="lrm-cert-dl" href="#" class="btn btn-ghost btn-sm" style="text-decoration:none">⬇ 下載</a>
       </div>
       <!-- 病單缺失警告（有 require_cert 但無 document_id） -->
       <div id="lrm-cert-warn" style="display:none;margin-bottom:12px;padding:10px 14px;background:#ffe8e8;border-radius:8px;border-left:3px solid var(--red)">
@@ -4184,7 +4204,7 @@ function showPage(page, e) {
   if (page === 'ann')             initAnn();
   if (page === 'holiday')         initHoliday();
   if (page === 'finance')         initFinance();
-  if (page === 'adminmgr')        loadAdminAccounts();
+  if (page === 'adminmgr')      { loadAdminAccounts(); loadAuditLogs(); }
   if (page === 'expense-review')  loadExpenseReview();
   if (page === 'perf')            initPerf();
   if (page === 'stores')          loadStores();
@@ -4566,6 +4586,7 @@ function refreshDeptDatalist() {
   punchStaffList.forEach(s => { if (s.department) names.add(s.department); });
   dl.innerHTML = [...names].sort().map(d => `<option value="${escHtml(d)}">`).join('');
 }
+let psPage = 0;           // 員工清單分頁
 let punchDocItems = [];   // 文件收件勾選項（文件管理的手動項目）
 let punchDeptList = [];   // 部門管理清單
 let punchFieldDefs = [];  // 員工自訂欄位定義
@@ -5922,7 +5943,7 @@ function renderLeaveRequests() {
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span style="font-size:12px;font-weight:700;color:${sc}">${sl}</span>
-          ${r.document_id?`<a href="/api/documents/${r.document_id}/image" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none">查看病單</a>`:''}
+          ${r.document_id?`<a href="/api/documents/${r.document_id}/image" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none">查看病單</a><a href="/api/documents/${r.document_id}/image?download=1" class="btn btn-ghost btn-sm" style="text-decoration:none;margin-left:4px">⬇ 下載</a>`:''}
           ${canReview?`<button class="btn btn-primary btn-sm" onclick="openLeaveReview(${r.id})">審核</button>`:''}
           <button class="btn btn-outline btn-sm" onclick="openLeaveAdminModal(${r.id})">編輯</button>
           <button class="btn btn-danger btn-sm" onclick="deleteLeaveReq(${r.id})">刪除</button>
@@ -5996,7 +6017,11 @@ function lamSetCert(docId) {
   document.getElementById('lam-cert-badge').style.display  = hasCert ? '' : 'none';
   document.getElementById('lam-cert-preview').style.display = hasCert ? '' : 'none';
   document.getElementById('lam-upload-area').style.display  = hasCert ? 'none' : '';
-  if (hasCert) document.getElementById('lam-cert-link').href = `/api/documents/${docId}/image`;
+  if (hasCert) {
+    document.getElementById('lam-cert-link').href = `/api/documents/${docId}/image`;
+    const dl = document.getElementById('lam-cert-dl');
+    if (dl) dl.href = `/api/documents/${docId}/image?download=1`;
+  }
 }
 function lamClearCert() {
   document.getElementById('lam-cert-file').value = '';
@@ -6113,6 +6138,8 @@ function openLeaveReview(id) {
   const approveBtn = document.getElementById('lrm-approve-btn');
   if (r.document_id) {
     certLink.href = `/api/documents/${r.document_id}/image`;
+    const certDl = document.getElementById('lrm-cert-dl');
+    if (certDl) certDl.href = `/api/documents/${r.document_id}/image?download=1`;
     certSec.style.display = '';
     certWarn.style.display = 'none';
     approveBtn.disabled = false;
@@ -8597,14 +8624,63 @@ function exportStaffExcel() {
   window.open('/api/bulk/staff/export?' + p.toString(), '_blank');
 }
 
+let _pendingImportFile = null;
 async function importStaffExcel(input) {
   const file = input.files[0];
   if (!file) return;
+  _pendingImportFile = file;
+  input.value = '';
+  // 先做預覽（不寫入），確認後才真正匯入
   const fd = new FormData(); fd.append('file', file);
+  showToast('分析檔案中…', 'info');
+  const resp = await fetch('/api/bulk/staff/import?preview=1', { method:'POST', body:fd });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) { showToast(data.error || '檔案分析失敗', 'error'); return; }
+
+  const fieldZh = { name:'姓名', employee_code:'員工編號', username:'帳號', department:'部門',
+    position_title:'職稱', company:'公司', national_id:'身分證字號', phone:'電話',
+    emergency_contact:'緊急聯絡人', gender:'性別', birth_date:'生日', hire_date:'到職日',
+    address:'地址', bank_code:'銀行代碼', bank_name:'銀行', bank_branch:'分行',
+    bank_account:'匯款帳號', account_holder:'戶名', active:'狀態' };
+  let html = `<div style="font-size:14px;line-height:2;background:var(--accent-light);border-radius:8px;padding:10px 14px;margin-bottom:12px">
+    預覽結果：將<strong style="color:var(--green)"> 新增 ${data.created} </strong>筆、
+    <strong style="color:var(--accent)">更新 ${data.updated} </strong>筆、略過 ${data.skipped} 筆
+    ${data.errors.length ? `、<strong style="color:var(--red)">問題 ${data.errors.length} 筆</strong>` : ''}
+    <br><span style="font-size:12px;color:var(--muted)">尚未寫入任何資料，請確認後按「確認匯入」</span></div>`;
+  if (data.creates && data.creates.length) {
+    html += `<div style="font-weight:600;color:var(--navy);margin-bottom:6px">將新增</div>
+      <div style="font-size:12px;line-height:1.9;margin-bottom:12px">` +
+      data.creates.slice(0, 30).map(c => `• ${escHtml(c.name)}（帳號 ${escHtml(c.username)}${c.auto_password ? '，密碼自動產生' : ''}）`).join('<br>') +
+      (data.creates.length > 30 ? `<br>…共 ${data.creates.length} 筆` : '') + `</div>`;
+  }
+  if (data.updates && data.updates.length) {
+    html += `<div style="font-weight:600;color:var(--navy);margin-bottom:6px">將更新</div>
+      <div style="font-size:12px;line-height:1.9;margin-bottom:12px">` +
+      data.updates.slice(0, 30).map(u => `• ${escHtml(u.name)}：` +
+        Object.entries(u.changes).map(([k, [o, n]]) =>
+          `${escHtml(fieldZh[k] || k)} ${escHtml(o || '（空）')}→${escHtml(n)}`).join('、')
+      ).join('<br>') +
+      (data.updates.length > 30 ? `<br>…共 ${data.updates.length} 筆` : '') + `</div>`;
+  }
+  if (data.errors.length) {
+    html += `<div style="font-weight:600;color:var(--red);margin-bottom:6px">問題（將略過）</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8;margin-bottom:12px">` +
+      data.errors.map(e => `• ${escHtml(e)}`).join('<br>') + `</div>`;
+  }
+  html += `<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px">
+    <button class="btn btn-outline" onclick="document.getElementById('bulk-result-overlay').style.display='none'">取消</button>
+    <button class="btn btn-primary" onclick="confirmStaffImport()">確認匯入</button></div>`;
+  showBulkResult('匯入預覽', html);
+}
+
+async function confirmStaffImport() {
+  if (!_pendingImportFile) return;
+  document.getElementById('bulk-result-overlay').style.display = 'none';
+  const fd = new FormData(); fd.append('file', _pendingImportFile);
+  _pendingImportFile = null;
   showToast('匯入處理中…', 'info');
   const resp = await fetch('/api/bulk/staff/import', { method:'POST', body:fd });
   const data = await resp.json().catch(() => ({}));
-  input.value = '';
   if (!resp.ok) { showToast(data.error || '匯入失敗', 'error'); return; }
 
   let html = `<div style="font-size:14px;line-height:2">
@@ -9142,6 +9218,23 @@ async function syncPayroll(month) {
 
 // ── 帳號管理模組 ──────────────────────────────────────────────
 let adminAccList = [];
+async function loadAuditLogs() {
+  const tb = document.getElementById('audit-tbody');
+  if (!tb) return;
+  const q = document.getElementById('audit-search')?.value.trim() || '';
+  const { ok, data } = await api('/api/audit/logs' + (q ? `?q=${encodeURIComponent(q)}` : ''), {}, true);
+  if (!ok) { tb.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="empty-state-text">僅超級管理員可檢視</div></td></tr>'; return; }
+  if (!data.length) { tb.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="empty-state-text">尚無紀錄</div></td></tr>'; return; }
+  tb.innerHTML = data.map(r => `<tr>
+    <td style="font-size:12px;color:var(--muted)">${new Date(r.created_at).toLocaleString('zh-TW',{hour12:false})}</td>
+    <td style="font-family:'Noto Sans TC',sans-serif">${escHtml(r.actor)}${r.actor_type==='staff'?' <span class="badge" style="background:var(--accent-light);color:var(--accent)">員工</span>':''}</td>
+    <td style="font-family:'Noto Sans TC',sans-serif;font-weight:600">${escHtml(r.action)}</td>
+    <td style="font-family:'Noto Sans TC',sans-serif">${escHtml(r.target||'—')}</td>
+    <td style="font-family:'Noto Sans TC',sans-serif;font-size:12px;color:var(--muted)">${escHtml(r.detail||'')}</td>
+    <td style="font-size:11px;color:var(--muted)">${escHtml(r.ip||'')}</td>
+  </tr>`).join('');
+}
+
 async function loadAdminAccounts() {
   const { ok, data } = await api('/api/admin/accounts', {}, true);
   adminAccList = ok ? data : [];
@@ -10649,7 +10742,7 @@ function renderDocsMatrix() {
   const head = `<tr>
     <th style="position:sticky;left:0;background:#f7f9fd;z-index:2;min-width:96px;box-shadow:1px 0 0 var(--border)">姓名</th>
     <th>部門</th>
-    ${types.map(t => `<th style="text-align:center;white-space:nowrap">${escHtml(t.name)}${t.required ? '' : '<span style="font-weight:400;color:var(--muted)"> (選)'+'</span>'}</th>`).join('')}
+    ${types.map(t => `<th style="text-align:center;white-space:nowrap;cursor:pointer" onclick="batchMarkColumn(${t.id},'${escHtml(t.name)}')" title="點擊可整欄批次標記">${escHtml(t.name)}${t.required ? '' : '<span style="font-weight:400;color:var(--muted)"> (選)'+'</span>'}</th>`).join('')}
     <th style="text-align:center">缺件數</th>
   </tr>`;
 
@@ -10663,6 +10756,13 @@ function renderDocsMatrix() {
         bg    = c.source === 'auto' ? '#f1f4f9' : 'var(--green-light)';
         title = c.source === 'auto' ? '系統自動判定' : '已收';
         if (c.content) title += '：' + c.content;
+        if (c.expiry_state === 'expired') {
+          mark = '⚠'; color = 'var(--red)'; bg = 'var(--red-light)';
+          title = `已過期（${c.expiry_date}）`;
+        } else if (c.expiry_state === 'expiring') {
+          mark = '✓'; color = '#b45309'; bg = '#fef3c7';
+          title = `即將到期（${c.expiry_date}）`;
+        }
       } else if (c.status === 'na') {
         mark = '免'; color = 'var(--muted)'; bg = '#f1f4f9'; title = '免附';
       } else {
@@ -10687,6 +10787,36 @@ function renderDocsMatrix() {
   wrap.innerHTML = `<table class="data-table" style="margin:0"><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
 
+// ── 缺件提醒 ─────────────────────────────────────────────────
+async function sendDocReminders() {
+  if (!confirm('將以 LINE 推播提醒所有缺件員工繳交文件，確定發送？\n（每週一 09:00 系統也會自動發送）')) return;
+  const { ok, data } = await api('/api/documents/remind', apiJSON({}));
+  if (!ok) return;
+  showToast(`已通知 ${data.notified} 位員工${data.no_line ? `（${data.no_line} 位未綁定 LINE 無法通知）` : ''}`, 'success');
+}
+
+// ── 整欄批次標記 ──────────────────────────────────────────────
+async function batchMarkColumn(typeId, typeName) {
+  // 以目前篩選後顯示中的員工為對象
+  const q    = (document.getElementById('docs-search')?.value || '').toLowerCase();
+  const dept = document.getElementById('docs-dept')?.value || '';
+  const onlyMissing = document.getElementById('docs-only-missing')?.checked;
+  let staff = docsMatrixData.staff;
+  if (q)    staff = staff.filter(s => s.name.toLowerCase().includes(q));
+  if (dept) staff = staff.filter(s => s.department === dept);
+  if (onlyMissing) staff = staff.filter(s => s.missing_count > 0);
+  if (!staff.length) { showToast('目前沒有顯示中的員工', 'error'); return; }
+  const choice = prompt(`批次標記「${typeName}」（對目前顯示的 ${staff.length} 位員工）\n輸入：1=全部標已收　2=全部標缺件　3=全部標免附\n（取消請按取消）`);
+  const map = { '1': 'received', '2': 'missing', '3': 'na' };
+  if (!map[choice]) return;
+  const { ok, data } = await api('/api/documents/set-batch', apiJSON({
+    doc_type_id: typeId, staff_ids: staff.map(s => s.id), status: map[choice],
+  }));
+  if (!ok) return;
+  showToast(`已批次更新 ${data.updated} 位員工的「${typeName}」`, 'success');
+  loadDocsMatrix();
+}
+
 // ── 收件狀態 Modal ────────────────────────────────────────────
 function openDocCellModal(staffId, typeId) {
   const s = docsMatrixData.staff.find(x => x.id === staffId);
@@ -10700,6 +10830,7 @@ function openDocCellModal(staffId, typeId) {
   document.getElementById('dcm-content').value = c.content || '';
   document.getElementById('dcm-note').value    = c.note || '';
   document.getElementById('dcm-date').value    = c.received_date || '';
+  document.getElementById('dcm-expiry').value  = c.expiry_date || '';
   const hint = document.getElementById('dcm-auto-hint');
   if (c.source === 'auto') {
     hint.style.display = '';
@@ -10720,6 +10851,7 @@ async function saveDocCell() {
     doc_type_id:   parseInt(document.getElementById('dcm-type-id').value),
     status:        document.getElementById('dcm-status').value,
     content:       document.getElementById('dcm-content').value,
+    expiry_date:   document.getElementById('dcm-expiry').value || null,
     note:          document.getElementById('dcm-note').value,
     received_date: document.getElementById('dcm-date').value || null,
   };
@@ -10845,8 +10977,19 @@ function renderPunchStaff() {
   if (dept)   list = list.filter(s => (s.department||'') === dept);
   if (status !== '' && status != null) list = list.filter(s => String(s.active?1:0) === status);
   document.getElementById('punch-staff-count').textContent = `共 ${list.length} 位員工`;
-  if (!list.length) { tb.innerHTML = '<tr><td colspan="9" class="empty-state"><div class="empty-state-text">無符合員工</div></td></tr>'; return; }
-  tb.innerHTML = list.map(s => {
+  if (!list.length) { tb.innerHTML = '<tr><td colspan="10" class="empty-state"><div class="empty-state-text">無符合員工</div></td></tr>'; document.getElementById('ps-pagination').innerHTML=''; return; }
+  // 分頁（每頁 50 位）
+  const PAGE_SIZE = 50;
+  const pages = Math.ceil(list.length / PAGE_SIZE);
+  if (psPage >= pages) psPage = pages - 1;
+  if (psPage < 0) psPage = 0;
+  const pageList = list.slice(psPage * PAGE_SIZE, (psPage + 1) * PAGE_SIZE);
+  const pg = document.getElementById('ps-pagination');
+  pg.innerHTML = pages > 1 ? `
+    <button class="btn btn-outline btn-sm" ${psPage===0?'disabled':''} onclick="psPage--;renderPunchStaff()">‹ 上一頁</button>
+    <span style="font-size:13px;color:var(--muted)">第 ${psPage+1} / ${pages} 頁</span>
+    <button class="btn btn-outline btn-sm" ${psPage>=pages-1?'disabled':''} onclick="psPage++;renderPunchStaff()">下一頁 ›</button>` : '';
+  tb.innerHTML = pageList.map(s => {
     const dept = [s.department, s.role].filter(Boolean).join(' / ') || '—';
     const bankInfo = s.bank_account
       ? `<span style="font-family:'DM Mono',monospace;font-size:11px">${escHtml(s.bank_name||'')} ${escHtml(s.bank_account)}</span>`
@@ -10854,8 +10997,12 @@ function renderPunchStaff() {
     const pwCell = s.password_plain
       ? `<span class="pw-mask" id="pw${s.id}" data-shown="0">••••••</span><button class="pw-eye" onclick="togglePw(${s.id})" title="顯示/隱藏密碼">👁</button>`
       : '<span style="color:var(--muted);font-size:12px">未設定</span>';
+    const avatar = s.has_photo
+      ? `<img src="/api/punch/staff/${s.id}/photo" loading="lazy" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:1px solid var(--border)">`
+      : `<span style="display:inline-flex;width:34px;height:34px;border-radius:50%;background:var(--bg);border:1px solid var(--border);align-items:center;justify-content:center;font-size:15px;opacity:.4">👤</span>`;
     return `<tr draggable="true" data-id="${s.id}" style="cursor:default">
     <td style="cursor:grab;text-align:center;color:var(--muted);font-size:16px;user-select:none" class="drag-handle" title="拖曳排序">⠿</td>
+    <td style="text-align:center;padding:6px">${avatar}</td>
     <td style="font-weight:600">${escHtml(s.name)}</td>
     <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">${escHtml(s.employee_code||'—')}</td>
     <td style="color:var(--muted);font-size:13px">${escHtml(dept)}</td>
@@ -11170,7 +11317,7 @@ function filterExpenseReview() {
       <td>${esc(c.category)}</td>
       <td style="font-family:'DM Mono',monospace;text-align:right">NT$ ${fmtNum(c.amount)}</td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.note||'—')}</td>
-      <td style="text-align:center">${c.document_id ? `<a href="/api/documents/${c.document_id}/image" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none">📎 查看附件</a>` : '—'}</td>
+      <td style="text-align:center">${c.document_id ? `<a href="/api/documents/${c.document_id}/image" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none">📎 查看</a> <a href="/api/documents/${c.document_id}/image?download=1" style="color:var(--muted);font-size:12px;text-decoration:none">⬇ 下載</a>` : '—'}</td>
       <td><span style="color:${statusColor[c.status]||'var(--muted)'};font-size:12px;font-weight:600">${statusMap[c.status]||c.status}</span></td>
       <td>
         ${c.status === 'pending' ? `

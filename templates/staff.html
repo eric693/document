@@ -207,6 +207,7 @@ html,body{min-height:100%;background:var(--navy);font-family:"Noto Sans TC",sans
         <button class="tab" style="display:none" id="tab-payslip"       onclick="switchTab('payslip')">薪資單</button>
         <button class="tab"        id="tab-expense"       onclick="switchTab('expense')" style="position:relative">費用報帳<span id="expense-badge" style="display:none;position:absolute;top:6px;right:6px;background:var(--red);color:#fff;border-radius:50%;width:16px;height:16px;font-size:10px;line-height:16px;text-align:center"></span></button>
         <button class="tab"        id="tab-myperf"        onclick="switchTab('myperf')">我的考核</button>
+        <button class="tab"        id="tab-myprofile"     onclick="switchTab('myprofile')">我的資料</button>
         <button class="tab"        id="tab-biodev"        onclick="switchTab('biodev')">安全裝置</button>
       </div>
 
@@ -459,6 +460,39 @@ html,body{min-height:100%;background:var(--navy);font-family:"Noto Sans TC",sans
         </div>
       </div>
 
+      <!-- 我的資料 tab -->
+      <div id="panel-myprofile" class="tab-body" style="display:none">
+        <div style="background:#fff;border-radius:12px;border:1.5px solid var(--border);padding:18px 16px;margin-bottom:16px">
+          <div class="fm-section">
+            <div class="fm-sec-head"><span class="dot"></span><span class="t">基本資料（由公司管理）</span><span class="line"></span></div>
+            <div style="display:flex;gap:14px;align-items:center;margin-bottom:12px">
+              <div style="width:64px;height:64px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">
+                <img id="mp-photo" style="display:none;width:100%;height:100%;object-fit:cover">
+                <span id="mp-photo-ph" style="font-size:20px;opacity:.35">👤</span>
+              </div>
+              <div style="flex:1">
+                <div id="mp-name" style="font-size:16px;font-weight:700;color:var(--navy)">—</div>
+                <div id="mp-meta" style="font-size:12px;color:var(--muted);margin-top:2px">—</div>
+              </div>
+            </div>
+            <div id="mp-readonly" style="font-size:13px;line-height:2;color:var(--text);background:var(--bg);border-radius:8px;padding:10px 14px"></div>
+          </div>
+          <div class="fm-section">
+            <div class="fm-sec-head"><span class="dot"></span><span class="t">聯絡資料（可自行更新）</span><span class="line"></span></div>
+            <div style="margin-bottom:10px"><div class="fl">電話</div><input class="fi" id="mp-phone" placeholder="例：0912345678" style="margin-bottom:0"></div>
+            <div style="margin-bottom:10px"><div class="fl">緊急聯絡人</div><input class="fi" id="mp-emergency" placeholder="例：王大明 0987654321" style="margin-bottom:0"></div>
+            <div style="margin-bottom:12px"><div class="fl">地址</div><input class="fi" id="mp-address" placeholder="通訊地址" style="margin-bottom:0"></div>
+            <div style="margin-bottom:4px">
+              <div class="fl">更新照片</div>
+              <input type="file" id="mp-photo-input" accept="image/*" style="display:none" onchange="mpPhotoSelected(event)">
+              <button class="btn btn-outline btn-sm" onclick="document.getElementById('mp-photo-input').click()">選擇照片</button>
+              <span id="mp-photo-status" style="font-size:12px;color:var(--muted);margin-left:8px"></span>
+            </div>
+          </div>
+          <button class="btn btn-primary" style="width:100%;margin-top:16px" onclick="saveMyProfile()">儲存變更</button>
+        </div>
+      </div>
+
       <!-- 安全裝置 tab -->
       <div id="panel-biodev" class="tab-body" style="display:none">
         <div style="margin-bottom:16px">
@@ -624,7 +658,7 @@ function showMain(){
   switchTab('ann');   // 打卡功能暫時隱藏，預設顯示公告
 }
 function switchTab(tab){
-  ['ann','punch','sched','leave','schedule-view','overtime','attendance','payslip','expense','myperf','biodev'].forEach(t=>{
+  ['ann','punch','sched','leave','schedule-view','overtime','attendance','payslip','expense','myperf','myprofile','biodev'].forEach(t=>{
     document.getElementById('tab-'+t).classList.toggle('active',t===tab);
     document.getElementById('panel-'+t).style.display=t===tab?'':'none';
   });
@@ -638,6 +672,7 @@ function switchTab(tab){
   if(tab==='payslip')initPayslipTab();
   if(tab==='expense')initExpenseTab();
   if(tab==='myperf')loadMyPerf();
+  if(tab==='myprofile')loadMyProfile();
   if(tab==='biodev')initBiodevTab();
 }
 
@@ -2012,7 +2047,7 @@ function renderMyLeaveList() {
       <div style="padding:8px 14px;font-size:12px;color:var(--muted)">
         原因：${esc(r.reason || '')}
         ${r.substitute_name ? `　代理人：${esc(r.substitute_name)}` : ''}
-        ${r.document_id ? `<a href="/api/documents/${r.document_id}/image" target="_blank" style="margin-left:8px;color:var(--accent);font-size:11px;text-decoration:none">查看病單</a>` : ''}
+        ${r.document_id ? `<a href="/api/documents/${r.document_id}/image" target="_blank" style="margin-left:8px;color:var(--accent);font-size:11px;text-decoration:none">查看病單</a><a href="/api/documents/${r.document_id}/image?download=1" style="margin-left:6px;color:var(--muted);font-size:11px;text-decoration:none">⬇下載</a>` : ''}
         ${r.review_note ? `<div style="color:${sc};margin-top:4px">審核意見：${esc(r.review_note)}</div>` : ''}
         ${r.require_cert && !r.document_id && r.status !== 'approved' ? `
         <div style="margin-top:6px;padding:8px 10px;background:#fff7ed;border:1px solid var(--orange);border-radius:8px;display:flex;justify-content:space-between;align-items:center;gap:8px">
@@ -2216,6 +2251,68 @@ function initExpenseTab() {
   const today = new Date().toISOString().slice(0,10);
   document.getElementById('exp-date').value = today;
   loadMyExpenses();
+}
+
+/* ── 我的資料 ─────────────────────────────────────────────── */
+let _mpPhotoData = null;
+async function loadMyProfile() {
+  const res = await fetch('/api/punch/my-profile');
+  if (!res.ok) return;
+  const d = await res.json();
+  document.getElementById('mp-name').textContent = d.name || '—';
+  document.getElementById('mp-meta').textContent =
+    [d.employee_code, d.company, d.department, d.position_title].filter(Boolean).join('｜') || '—';
+  const ro = [];
+  if (d.national_id) ro.push(`身分證字號：${d.national_id}`);
+  if (d.hire_date)   ro.push(`到職日：${d.hire_date}`);
+  if (d.birth_date)  ro.push(`生日：${d.birth_date}`);
+  Object.entries(d.custom_fields || {}).forEach(([k, v]) => { if (v) ro.push(`${k}：${v}`); });
+  document.getElementById('mp-readonly').innerHTML =
+    ro.length ? ro.map(x => escXml(x)).join('<br>') : '<span style="color:var(--muted)">（無其他資料）</span>';
+  document.getElementById('mp-phone').value     = d.phone || '';
+  document.getElementById('mp-emergency').value = d.emergency_contact || '';
+  document.getElementById('mp-address').value   = d.address || '';
+  const img = document.getElementById('mp-photo'), ph = document.getElementById('mp-photo-ph');
+  if (d.has_photo) { img.src = '/api/punch/my-photo?t=' + Date.now(); img.style.display = ''; ph.style.display = 'none'; }
+  else { img.style.display = 'none'; ph.style.display = ''; }
+  _mpPhotoData = null;
+  document.getElementById('mp-photo-status').textContent = '';
+}
+function escXml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function mpPhotoSelected(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const im = new Image();
+    im.onload = () => {
+      const MAX = 600, sc = Math.min(1, MAX / Math.max(im.width, im.height));
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(im.width * sc); cv.height = Math.round(im.height * sc);
+      cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+      _mpPhotoData = cv.toDataURL('image/jpeg', 0.85);
+      const img = document.getElementById('mp-photo');
+      img.src = _mpPhotoData; img.style.display = '';
+      document.getElementById('mp-photo-ph').style.display = 'none';
+      document.getElementById('mp-photo-status').textContent = '已選擇（儲存後生效）';
+    };
+    im.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+async function saveMyProfile() {
+  const body = {
+    phone:             document.getElementById('mp-phone').value.trim(),
+    emergency_contact: document.getElementById('mp-emergency').value.trim(),
+    address:           document.getElementById('mp-address').value.trim(),
+  };
+  if (_mpPhotoData !== null) body.photo_data = _mpPhotoData;
+  const res = await fetch('/api/punch/my-profile', {
+    method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) { showToast(d.error || '儲存失敗', 'err'); return; }
+  showToast('資料已更新', 'ok');
+  loadMyProfile();
 }
 
 async function expPhotoSelected(event) {

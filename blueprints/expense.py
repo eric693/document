@@ -9,6 +9,7 @@ from auth import login_required, require_module
 from db import get_db
 from config import ANTHROPIC_API_KEY
 from blueprints.notifications import _notify_review_result
+from blueprints.audit import log_action
 
 bp = Blueprint('expense', __name__)
 
@@ -226,5 +227,6 @@ def api_expense_review(cid):
         extra = f"標題：{claim['title']}　金額：${float(claim['amount']):,.0f}"
         if review_note: extra += f"\n意見：{review_note}"
         _notify_review_result(claim['staff_id'], '費用報帳', action, extra)
+        log_action('審核費用', f"申請 #{cid}", '核准' if action == 'approve' else '退回')
 
     return jsonify(_expense_row(row)) if row else ('', 404)

@@ -14,6 +14,7 @@ from auth import (login_required, require_module,
 from config import TW_TZ
 from db import get_db, hash_password, verify_password, is_legacy_hash
 from blueprints.notifications import _notify_review_result
+from blueprints.audit import log_action
 
 bp = Blueprint('punch', __name__)
 
@@ -35,8 +36,11 @@ def punch_staff_row(row):
     d.pop('password_hash', None)
     # password_plain 保留給後台檢視（清單端會對無權限管理員再行過濾）
     # 照片以獨立端點提供，避免清單 payload 過大
-    d['has_photo'] = bool(d.get('photo_data'))
-    d.pop('photo_data', None)
+    if 'photo_data' in d:
+        d['has_photo'] = bool(d.get('photo_data'))
+        d.pop('photo_data', None)
+    else:
+        d['has_photo'] = bool(d.get('has_photo'))
     d['custom_fields'] = d.get('custom_fields') or {}
     if d.get('created_at'): d['created_at'] = d['created_at'].isoformat()
     if d.get('hire_date'):  d['hire_date']  = d['hire_date'].isoformat()
@@ -191,6 +195,78 @@ def api_punch_me():
         session.pop('punch_staff_id', None)
         return jsonify({'error': 'not logged in'}), 401
     return jsonify(dict(staff))
+
+
+# ─── 員工自助：我的資料 ──────────────────────────────────────────────────────
+
+@bp.route('/api/punch/my-profile', methods=['GET'])
+def api_my_profile():
+    sid = session.get('punch_staff_id')
+    if not sid:
+        return jsonify({'error': '請先登入'}), 401
+    with get_db() as conn:
+        s = conn.execute("""
+            SELECT name, employee_code, company, department, position_title,
+                   hire_date, birth_date, national_id, phone, emergency_contact,
+                   address, custom_fields,
+                   (COALESCE(photo_data,'') <> '') AS has_photo
+            FROM punch_staff WHERE id=%s AND active=TRUE""", (sid,)).fetchone()
+    if not s:
+        return jsonify({'error': '帳號不存在'}), 404
+    d = dict(s)
+    for k in ('hire_date', 'birth_date'):
+        if d.get(k): d[k] = str(d[k])
+    d['custom_fields'] = d.get('custom_fields') or {}
+    return jsonify(d)
+
+
+@bp.route('/api/punch/my-profile', methods=['PUT'])
+def api_my_profile_update():
+    """員工自助更新聯絡資料（僅限電話/緊急聯絡人/地址/照片）"""
+    sid = session.get('punch_staff_id')
+    if not sid:
+        return jsonify({'error': '請先登入'}), 401
+    b = request.get_json(force=True) or {}
+    phone             = (b.get('phone') or '').strip()[:50]
+    emergency_contact = (b.get('emergency_contact') or '').strip()[:200]
+    address           = (b.get('address') or '').strip()[:300]
+    photo             = _clean_photo(b)   # None=不變更
+    with get_db() as conn:
+        extra_sql, extra_vals = '', []
+        if photo is not None:
+            extra_sql = ',photo_data=%s'
+            extra_vals = [photo]
+        row = conn.execute(f"""
+            UPDATE punch_staff SET phone=%s, emergency_contact=%s, address=%s{extra_sql}
+            WHERE id=%s AND active=TRUE RETURNING name""",
+            [phone, emergency_contact, address] + extra_vals + [sid]).fetchone()
+    if not row:
+        return jsonify({'error': '帳號不存在'}), 404
+    log_action('員工自助更新資料', row['name'],
+               '含照片' if (photo is not None and photo) else '')
+    return jsonify({'ok': True})
+
+
+@bp.route('/api/punch/my-photo', methods=['GET'])
+def api_my_photo():
+    """員工檢視自己的照片"""
+    sid = session.get('punch_staff_id')
+    if not sid:
+        return jsonify({'error': '請先登入'}), 401
+    with get_db() as conn:
+        row = conn.execute("SELECT photo_data FROM punch_staff WHERE id=%s", (sid,)).fetchone()
+    data = (row or {}).get('photo_data') or ''
+    if not data.startswith('data:image/'):
+        return jsonify({'error': '無照片'}), 404
+    import base64 as _b64mp
+    header, b64 = data.split(',', 1)
+    mime = header.split(':', 1)[1].split(';', 1)[0]
+    try:
+        raw = _b64mp.b64decode(b64)
+    except Exception:
+        return jsonify({'error': '照片資料損毀'}), 500
+    from flask import Response as _RespMp
+    return _RespMp(raw, mimetype=mime)
 
 
 # ─── GPS Settings ────────────────────────────────────────────────────────────
@@ -422,7 +498,18 @@ def api_punch_my_records():
 @login_required
 def api_punch_staff_list():
     with get_db() as conn:
-        rows = conn.execute("SELECT * FROM punch_staff ORDER BY sort_order, name").fetchall()
+        # 排除 photo_data 大欄位（200 位員工 × 照片會撐爆記憶體），改回傳 has_photo
+        rows = conn.execute("""
+            SELECT id, name, username, role, department, position_title, employee_code,
+                   hire_date, birth_date, base_salary, insured_salary, hourly_rate,
+                   daily_hours, salary_type, ot_rate1, ot_rate2, ot_rate3, vacation_quota,
+                   line_user_id, active, sort_order, store_id, terminated_at,
+                   termination_reason, created_at, bank_code, bank_name, bank_branch,
+                   bank_account, account_holder, salary_notes, national_id, gender,
+                   insurance_type, address, company, phone, emergency_contact,
+                   custom_fields, password_plain,
+                   (COALESCE(photo_data,'') <> '') AS has_photo
+            FROM punch_staff ORDER BY sort_order, name""").fetchall()
         # 文件收件狀態（手動登記項目，供員工表單勾選預填）
         doc_types = conn.execute(
             "SELECT id, name FROM document_types WHERE active=TRUE AND (staff_field='' OR staff_field IS NULL) ORDER BY sort_order, id"
@@ -548,6 +635,7 @@ def api_field_defs_delete(fid):
         # 一併移除所有員工上此欄位的值
         conn.execute("UPDATE punch_staff SET custom_fields = custom_fields - %s WHERE custom_fields ? %s",
                      (old['name'], old['name']))
+    log_action('刪除自訂欄位', old['name'], '所有員工該欄位值一併移除')
     return jsonify({'ok': True})
 
 
@@ -574,6 +662,7 @@ def api_departments_create():
     try:
         with get_db() as conn:
             row = conn.execute("INSERT INTO departments (name) VALUES (%s) RETURNING id", (name,)).fetchone()
+        log_action('新增部門', name)
         return jsonify({'ok': True, 'id': row['id']})
     except psycopg.errors.UniqueViolation:
         return jsonify({'error': '已有同名部門'}), 400
@@ -598,6 +687,7 @@ def api_departments_update(did):
                 cur = conn.execute("UPDATE punch_staff SET department=%s WHERE department=%s",
                                    (name, old['name']))
                 renamed = cur.rowcount
+        log_action('部門更名', f"{old['name']} → {name}", f'{renamed} 位員工同步更新')
         return jsonify({'ok': True, 'renamed_staff': renamed})
     except psycopg.errors.UniqueViolation:
         return jsonify({'error': '已有同名部門'}), 400
@@ -616,6 +706,7 @@ def api_departments_delete(did):
         if used['c'] > 0:
             return jsonify({'error': f'仍有 {used["c"]} 位在職員工屬於此部門，請先調整員工部門'}), 409
         conn.execute("DELETE FROM departments WHERE id=%s", (did,))
+    log_action('刪除部門', old['name'])
     return jsonify({'ok': True})
 
 
@@ -715,6 +806,7 @@ def api_punch_staff_create():
                   bank_code, bank_name, bank_branch, bank_account, account_holder,
                   company, national_id, phone, emergency_contact, address, photo, Json(cf))).fetchone()
             _apply_staff_documents(conn, row['id'], b.get('documents'))
+        log_action('新增員工', name, f'帳號 {username}')
         return jsonify(punch_staff_row(row)), 201
     except psycopg.errors.UniqueViolation:
         return jsonify({'error': '姓名或帳號已存在，請換一個'}), 409
@@ -787,6 +879,8 @@ def api_punch_staff_update(sid):
                   company, national_id, phone, emergency_contact, address] + extra_vals + [sid]).fetchone()
         if row:
             _apply_staff_documents(conn, sid, b.get('documents'))
+    if row:
+        log_action('編輯員工', name, '含密碼變更' if password else '')
     return jsonify(punch_staff_row(row)) if row else ('', 404)
 
 
@@ -813,7 +907,9 @@ def api_punch_staff_photo(sid):
 @require_module('punch')
 def api_punch_staff_delete(sid):
     with get_db() as conn:
+        old = conn.execute("SELECT name FROM punch_staff WHERE id=%s", (sid,)).fetchone()
         conn.execute("DELETE FROM punch_staff WHERE id=%s", (sid,))
+    log_action('刪除員工', (old or {}).get('name') or f'#{sid}', '連同打卡/文件記錄一併刪除')
     return jsonify({'deleted': sid})
 
 

@@ -41,6 +41,7 @@ from blueprints.performance  import _init_performance_db
 from blueprints.webauthn     import init_webauthn_db
 from blueprints.dashboard    import init_labor_law_db, start_labor_law_monitor
 from blueprints.documents    import init_documents_db
+from blueprints.audit        import init_audit_db
 
 init_leave_db()
 init_salary_db()
@@ -55,6 +56,7 @@ _init_performance_db()
 init_webauthn_db()
 init_labor_law_db()
 init_documents_db()
+init_audit_db()
 
 # ── 注冊 Blueprints ────────────────────────────────────────────────
 from blueprints.admin         import bp as admin_bp
@@ -77,6 +79,7 @@ from blueprints.dashboard     import bp as dashboard_bp
 from blueprints.exports       import bp as exports_bp
 from blueprints.documents     import bp as documents_bp
 from blueprints.bulk_io       import bp as bulk_io_bp
+from blueprints.audit         import bp as audit_bp
 
 app.register_blueprint(admin_bp)
 app.register_blueprint(punch_bp)
@@ -98,6 +101,7 @@ app.register_blueprint(dashboard_bp)
 app.register_blueprint(exports_bp)
 app.register_blueprint(documents_bp)
 app.register_blueprint(bulk_io_bp)
+app.register_blueprint(audit_bp)
 
 # ── Health check ───────────────────────────────────────────────────
 from flask import jsonify
@@ -116,6 +120,8 @@ def health():
 from startup import start_background_threads
 start_background_threads()
 start_labor_law_monitor()
+from blueprints.documents import start_doc_reminder_thread
+start_doc_reminder_thread()
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
