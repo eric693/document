@@ -15,25 +15,31 @@ bp = Blueprint('documents', __name__)
 
 # 「自動帶入欄位」白名單（doc type 可綁定 punch_staff 欄位，避免 SQL injection）
 STAFF_FIELD_WHITELIST = {
-    'name':          '姓名',
-    'birth_date':    '生日',
-    'hire_date':     '到職日',
-    'employee_code': '員工編號',
-    'bank_account':  '轉薪帳號',
-    'line_user_id':  'LINE 綁定',
+    'name':              '姓名',
+    'birth_date':        '生日',
+    'hire_date':         '到職日',
+    'employee_code':     '員工編號',
+    'bank_account':      '匯款帳號',
+    'line_user_id':      'LINE 綁定',
+    'photo_data':        '照片',
+    'company':           '公司',
+    'national_id':       '身分證字號',
+    'phone':             '電話',
+    'emergency_contact': '緊急聯絡人',
+    'address':           '地址',
 }
 
 # 預設文件項目（首次建表時 seed）
 DEFAULT_DOC_TYPES = [
     ('姓名',       'name'),
-    ('照片',       ''),
+    ('照片',       'photo_data'),
     ('員工編號',   'employee_code'),
-    ('公司',       ''),
-    ('身分證字號', ''),
-    ('電話',       ''),
-    ('緊急聯絡人', ''),
-    ('地址',       ''),
-    ('帳號',       ''),
+    ('公司',       'company'),
+    ('身分證字號', 'national_id'),
+    ('電話',       'phone'),
+    ('緊急聯絡人', 'emergency_contact'),
+    ('地址',       'address'),
+    ('帳號',       'bank_account'),
     ('體檢表',     ''),
     ('健檢表',     ''),
     ('印章',       ''),
@@ -95,7 +101,8 @@ def _build_matrix(conn):
     ).fetchall()]
     staff = conn.execute("""
         SELECT id, name, department, employee_code, birth_date, hire_date,
-               bank_account, line_user_id
+               bank_account, line_user_id,
+               photo_data, company, national_id, phone, emergency_contact, address
         FROM punch_staff WHERE active=TRUE
         ORDER BY sort_order, id
     """).fetchall()
@@ -120,8 +127,10 @@ def _build_matrix(conn):
                 field = t.get('staff_field') or ''
                 val = s.get(field) if field in STAFF_FIELD_WHITELIST else None
                 if val:
+                    # 照片為大型 data URI，內容以標記代替
+                    content = '照片已上傳' if field == 'photo_data' else str(val)
                     cell = {'status': 'received', 'source': 'auto',
-                            'content': str(val), 'note': '', 'received_date': '', 'updated_by': ''}
+                            'content': content, 'note': '', 'received_date': '', 'updated_by': ''}
                 else:
                     cell = {'status': 'missing', 'source': 'none',
                             'content': '', 'note': '', 'received_date': '', 'updated_by': ''}

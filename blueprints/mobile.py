@@ -126,6 +126,10 @@ def mobile_login():
             with get_db() as conn:
                 conn.execute("UPDATE punch_staff SET password_hash=%s WHERE id=%s",
                              (hash_password(password), staff['id']))
+        if not (staff.get('password_plain') or ''):
+            with get_db() as conn:
+                conn.execute("UPDATE punch_staff SET password_plain=%s WHERE id=%s",
+                             (password, staff['id']))
         token = _make_jwt({
             'sub': str(staff['id']), 'role': 'employee',
             'staff_id': staff['id'], 'name': staff['name'], 'username': staff['username'],

@@ -99,7 +99,24 @@ def api_expense_ocr():
     media_type = file.content_type or 'image/jpeg'
     if media_type not in ('image/jpeg', 'image/png', 'image/gif', 'image/webp'):
         media_type = 'image/jpeg'
+    if len(raw) > 10 * 1024 * 1024:
+        return jsonify({'error': '檔案不可超過 10MB'}), 400
     img_b64 = base64.standard_b64encode(raw).decode()
+
+    # 先儲存影像（含 image_data），OCR 失敗也能保留收據附件供之後開啟
+    image_data = 'data:' + media_type + ';base64,' + img_b64
+    doc_id = None
+    try:
+        with get_db() as conn:
+            doc = conn.execute("""
+                INSERT INTO finance_documents
+                  (filename, doc_type, image_data, upload_date, uploaded_by_staff)
+                VALUES (%s,'receipt',%s,CURRENT_DATE,%s) RETURNING id
+            """, (file.filename, image_data, sid)).fetchone()
+        doc_id = doc['id']
+    except Exception as e:
+        print(f"[expense_ocr doc] {e}")
+
     client = _ant.Anthropic(api_key=ANTHROPIC_API_KEY)
     try:
         msg = client.messages.create(
@@ -114,16 +131,20 @@ def api_expense_ocr():
         text = _re2.sub(r'\s*```$', '', text, flags=_re2.MULTILINE)
         result = _json.loads(text)
     except Exception as e:
+        # OCR 失敗仍回傳 document_id，讓收據附件可以送出
+        if doc_id:
+            return jsonify({'document_id': doc_id, 'ocr_error': str(e)})
         return jsonify({'error': f'OCR 失敗：{e}'}), 500
-    try:
-        with get_db() as conn:
-            doc = conn.execute("""
-                INSERT INTO finance_documents (filename, doc_type, ocr_raw)
-                VALUES (%s,%s,%s) RETURNING id
-            """, (file.filename, result.get('doc_type', ''), _json.dumps(result))).fetchone()
-        result['document_id'] = doc['id']
-    except Exception as e:
-        print(f"[expense_ocr doc] {e}")
+
+    if doc_id:
+        try:
+            with get_db() as conn:
+                conn.execute(
+                    "UPDATE finance_documents SET doc_type=%s, ocr_raw=%s WHERE id=%s",
+                    (result.get('doc_type', 'receipt'), _json.dumps(result), doc_id))
+        except Exception as e:
+            print(f"[expense_ocr update] {e}")
+    result['document_id'] = doc_id
     return jsonify(result)
 
 

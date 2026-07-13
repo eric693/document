@@ -58,6 +58,16 @@ html,body{min-height:100%;background:var(--navy);font-family:"Noto Sans TC",sans
 .p-bout{background:var(--orange);color:#fff}.p-bin{background:var(--accent);color:#fff}
 .log-section{border-top:1px solid var(--border);padding:14px 20px}
 .section-label{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:9px}
+/* 表單分區（與後台一致的設計語言） */
+.fm-section + .fm-section{margin-top:20px}
+.fm-sec-head{display:flex;align-items:center;gap:9px;margin-bottom:13px}
+.fm-sec-head .dot{width:7px;height:7px;border-radius:50%;background:#c8a96e;flex-shrink:0}
+.fm-sec-head .t{font-size:11px;font-weight:700;color:var(--navy);letter-spacing:.1em;white-space:nowrap}
+.fm-sec-head .line{flex:1;height:1px;background:var(--border)}
+.fm-check{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;color:var(--text);padding:9px 14px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);transition:all .15s;user-select:none}
+.fm-check:has(input:checked){border-color:var(--accent);background:var(--accent-light);color:var(--navy);font-weight:600}
+.fm-check input{accent-color:var(--accent);margin:0}
+.fm-grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .log-item{display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f2f8}
 .log-item:last-child{border-bottom:none}
 .lb{font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px}
@@ -302,25 +312,30 @@ html,body{min-height:100%;background:var(--navy);font-family:"Noto Sans TC",sans
         <div style="margin-bottom:14px;padding:10px 14px;background:var(--orange-light);border-radius:8px;border:1px solid #f5c0a0;font-size:12px;color:var(--text)">
           <strong>勞基法加班費</strong>：前 2 小時 × 1.33、第 3 小時起 × 1.67
         </div>
-        <div style="background:#fff;border-radius:10px;border:1.5px solid var(--border);padding:16px;margin-bottom:16px">
-          <div class="section-label" style="margin-bottom:12px">新增加班申請</div>
-          <div style="margin-bottom:10px"><div class="fl">加班日期</div><input class="fi" type="date" id="ot-date" style="margin-bottom:8px"></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-            <div><div class="fl">開始時間</div><input class="fi" type="time" id="ot-start" style="margin-bottom:0"></div>
-            <div><div class="fl">結束時間</div><input class="fi" type="time" id="ot-end" style="margin-bottom:0"></div>
+        <div style="background:#fff;border-radius:12px;border:1.5px solid var(--border);padding:18px 16px;margin-bottom:16px">
+          <div class="fm-section">
+            <div class="fm-sec-head"><span class="dot"></span><span class="t">加班時段</span><span class="line"></span></div>
+            <div style="margin-bottom:10px"><div class="fl">加班日期</div><input class="fi" type="date" id="ot-date" style="margin-bottom:0"></div>
+            <div class="fm-grid2" style="margin-bottom:10px">
+              <div><div class="fl">開始時間</div><input class="fi" type="time" id="ot-start" style="margin-bottom:0"></div>
+              <div><div class="fl">結束時間</div><input class="fi" type="time" id="ot-end" style="margin-bottom:0"></div>
+            </div>
+            <div id="ot-hours-preview" style="font-size:12px;color:var(--accent);min-height:16px"></div>
           </div>
-          <div id="ot-hours-preview" style="font-size:12px;color:var(--accent);margin-bottom:10px;min-height:16px"></div>
-          <div style="margin-bottom:10px">
-            <div class="fl">加班日別</div>
-            <select class="fi" id="ot-day-type" onchange="updateOTHoursPreview()" style="margin-bottom:0">
-              <option value="weekday">平日（前2h×1.33，後續×1.67）</option>
-              <option value="rest_day">休息日（最少4h）</option>
-              <option value="holiday">國定假日（全程×2倍）</option>
-              <option value="special">例假日（全程×2倍）</option>
-            </select>
+          <div class="fm-section">
+            <div class="fm-sec-head"><span class="dot"></span><span class="t">日別與原因</span><span class="line"></span></div>
+            <div style="margin-bottom:10px">
+              <div class="fl">加班日別</div>
+              <select class="fi" id="ot-day-type" onchange="updateOTHoursPreview()" style="margin-bottom:0">
+                <option value="weekday">平日（前2h×1.33，後續×1.67）</option>
+                <option value="rest_day">休息日（最少4h）</option>
+                <option value="holiday">國定假日（全程×2倍）</option>
+                <option value="special">例假日（全程×2倍）</option>
+              </select>
+            </div>
+            <div><div class="fl">加班原因 *</div><input class="fi" id="ot-reason" placeholder="例：客戶急件、備料作業" style="margin-bottom:0"></div>
           </div>
-          <div style="margin-bottom:14px"><div class="fl">加班原因 *</div><input class="fi" id="ot-reason" placeholder="例：客戶急件、備料作業" style="margin-bottom:0"></div>
-          <button class="btn btn-primary" style="width:100%" onclick="submitOTRequest()">送出加班申請</button>
+          <button class="btn btn-primary" style="width:100%;margin-top:16px" onclick="submitOTRequest()">送出加班申請</button>
         </div>
         <div class="section-label" style="margin-bottom:10px">我的申請記錄</div>
         <div id="my-ot-list"><div style="text-align:center;color:var(--muted);font-size:13px;padding:16px">載入中...</div></div>
@@ -347,65 +362,66 @@ html,body{min-height:100%;background:var(--navy);font-family:"Noto Sans TC",sans
         </div>
 
         <!-- 新增請假申請 -->
-        <div style="background:#fff;border-radius:10px;border:1.5px solid var(--border);padding:16px;margin-bottom:16px">
-          <div class="section-label" style="margin-bottom:12px">新增請假申請</div>
-          <div style="margin-bottom:10px">
-            <div class="fl">假別 *</div>
-            <select class="fi" id="leave-type-sel" style="width:100%;margin-bottom:0" onchange="_onLeaveTypeChange()"></select>
-          </div>
-          <div id="leave-type-info" style="font-size:12px;color:var(--muted);margin-bottom:10px;min-height:16px"></div>
-          <!-- 請假方式切換（僅支援小時的假別顯示） -->
-          <div id="leave-unit-toggle" style="display:none;margin-bottom:10px">
-            <div class="fl">請假方式</div>
-            <div style="display:flex;gap:10px">
-              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-                <input type="radio" name="leave-unit" id="leave-unit-day" value="day" checked onchange="_onLeaveUnitChange()"> 以天數請假
-              </label>
-              <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
-                <input type="radio" name="leave-unit" id="leave-unit-hour" value="hour" onchange="_onLeaveUnitChange()"> 以小時請假
-              </label>
+        <div style="background:#fff;border-radius:12px;border:1.5px solid var(--border);padding:18px 16px;margin-bottom:16px">
+          <div class="fm-section">
+            <div class="fm-sec-head"><span class="dot"></span><span class="t">假別選擇</span><span class="line"></span></div>
+            <div style="margin-bottom:8px">
+              <div class="fl">假別 *</div>
+              <select class="fi" id="leave-type-sel" style="width:100%;margin-bottom:0" onchange="_onLeaveTypeChange()"></select>
             </div>
-          </div>
-          <!-- 天數請假區 -->
-          <div id="leave-dates-section">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-              <div><div class="fl">開始日期 *</div><input class="fi" type="date" id="leave-start" style="margin-bottom:0" onchange="previewLeaveStaff()"></div>
-              <div><div class="fl">結束日期 *</div><input class="fi" type="date" id="leave-end"   style="margin-bottom:0" onchange="previewLeaveStaff()"></div>
-            </div>
-            <div style="display:flex;gap:16px;margin-bottom:10px">
-              <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="leave-start-half" onchange="previewLeaveStaff()"> 開始日下午請假</label>
-              <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer"><input type="checkbox" id="leave-end-half"   onchange="previewLeaveStaff()"> 結束日上午請假</label>
-            </div>
-            <div id="leave-days-preview" style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:10px;min-height:18px"></div>
-          </div>
-          <!-- 小時請假區 -->
-          <div id="leave-hours-section" style="display:none">
-            <div style="margin-bottom:10px">
-              <div class="fl">請假日期 *</div>
-              <input class="fi" type="date" id="leave-hour-date" style="margin-bottom:0">
-            </div>
-            <div style="margin-bottom:10px">
-              <div class="fl">請假時數 *</div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <input class="fi" type="number" id="leave-hour-count" min="0.5" max="8" step="0.5" placeholder="例：2" style="margin-bottom:0;width:100px">
-                <span style="font-size:13px;color:var(--muted)">小時（0.5～8）</span>
+            <div id="leave-type-info" style="font-size:12px;color:var(--muted);min-height:16px"></div>
+            <!-- 請假方式切換（僅支援小時的假別顯示） -->
+            <div id="leave-unit-toggle" style="display:none;margin-top:8px">
+              <div class="fl">請假方式</div>
+              <div style="display:flex;gap:8px">
+                <label class="fm-check" style="flex:1;justify-content:center">
+                  <input type="radio" name="leave-unit" id="leave-unit-day" value="day" checked onchange="_onLeaveUnitChange()"> 以天數請假
+                </label>
+                <label class="fm-check" style="flex:1;justify-content:center">
+                  <input type="radio" name="leave-unit" id="leave-unit-hour" value="hour" onchange="_onLeaveUnitChange()"> 以小時請假
+                </label>
               </div>
             </div>
           </div>
-          <div id="leave-balance-info" style="font-size:12px;color:var(--muted);padding:8px 10px;background:var(--bg);border-radius:6px;margin-bottom:6px;min-height:32px"></div>
-          <button class="btn btn-outline" style="width:100%;font-size:12px;margin-bottom:10px" onclick="showMyAnnualSchedule()">查看我的特休排程</button>
-          <div style="margin-bottom:10px"><div class="fl">請假原因 *</div><input class="fi" id="leave-reason" placeholder="例：身體不適、家庭事務" style="margin-bottom:0"></div>
-          <div style="margin-bottom:14px"><div class="fl">代理人（選填）</div><input class="fi" id="leave-sub" placeholder="例：王小明" style="margin-bottom:0"></div>
-          <!-- 病假病單上傳 -->
-          <div id="leave-cert-section" style="display:none;margin-bottom:14px;padding:12px;background:var(--bg);border-radius:8px;border:1.5px dashed var(--border)">
-            <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px">此假別需上傳病單/證明</div>
-            <div style="font-size:11px;color:var(--muted);margin-bottom:8px">手邊還沒有病單？可先送出申請，之後在下方請假記錄中補上傳（補件前主管無法核准）</div>
-            <input type="file" id="leave-cert-input" accept="image/*,.pdf" style="display:none" onchange="leaveCertSelected(event)">
-            <button class="btn btn-outline btn-sm" onclick="document.getElementById('leave-cert-input').click()">選擇病單圖片</button>
-            <div id="leave-cert-status" style="font-size:12px;color:var(--muted);margin-top:6px"></div>
-            <img id="leave-cert-preview" style="display:none;max-width:100%;max-height:160px;border-radius:6px;margin-top:8px;border:1px solid var(--border)">
+          <div class="fm-section">
+            <div class="fm-sec-head"><span class="dot"></span><span class="t">請假期間</span><span class="line"></span></div>
+            <!-- 天數請假區 -->
+            <div id="leave-dates-section">
+              <div class="fm-grid2" style="margin-bottom:10px">
+                <div><div class="fl">開始日期 *</div><input class="fi" type="date" id="leave-start" style="margin-bottom:0" onchange="previewLeaveStaff()"></div>
+                <div><div class="fl">結束日期 *</div><input class="fi" type="date" id="leave-end"   style="margin-bottom:0" onchange="previewLeaveStaff()"></div>
+              </div>
+              <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+                <label class="fm-check" style="font-size:12px"><input type="checkbox" id="leave-start-half" onchange="previewLeaveStaff()"> 開始日下午請假</label>
+                <label class="fm-check" style="font-size:12px"><input type="checkbox" id="leave-end-half"   onchange="previewLeaveStaff()"> 結束日上午請假</label>
+              </div>
+              <div id="leave-days-preview" style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:6px;min-height:18px"></div>
+            </div>
+            <!-- 小時請假區 -->
+            <div id="leave-hours-section" style="display:none">
+              <div class="fm-grid2" style="margin-bottom:10px">
+                <div><div class="fl">請假日期 *</div><input class="fi" type="date" id="leave-hour-date" style="margin-bottom:0"></div>
+                <div><div class="fl">請假時數 *（0.5～8）</div><input class="fi" type="number" id="leave-hour-count" min="0.5" max="8" step="0.5" placeholder="例：2" style="margin-bottom:0"></div>
+              </div>
+            </div>
+            <div id="leave-balance-info" style="font-size:12px;color:var(--muted);padding:9px 12px;background:var(--bg);border-radius:8px;margin-bottom:8px;min-height:32px"></div>
+            <button class="btn btn-outline" style="width:100%;font-size:12px" onclick="showMyAnnualSchedule()">查看我的特休排程</button>
           </div>
-          <button class="btn btn-primary" style="width:100%" onclick="submitLeaveRequest()">送出請假申請</button>
+          <div class="fm-section">
+            <div class="fm-sec-head"><span class="dot"></span><span class="t">原因與證明</span><span class="line"></span></div>
+            <div style="margin-bottom:10px"><div class="fl">請假原因 *</div><input class="fi" id="leave-reason" placeholder="例：身體不適、家庭事務" style="margin-bottom:0"></div>
+            <div style="margin-bottom:12px"><div class="fl">代理人（選填）</div><input class="fi" id="leave-sub" placeholder="例：王小明" style="margin-bottom:0"></div>
+            <!-- 病假病單上傳 -->
+            <div id="leave-cert-section" style="display:none;margin-bottom:4px;padding:13px;background:var(--bg);border-radius:10px;border:1.5px dashed var(--border)">
+              <div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:4px">📎 此假別需上傳病單／證明</div>
+              <div style="font-size:11px;color:var(--muted);margin-bottom:8px">手邊還沒有病單？可先送出申請，之後在下方請假記錄中補上傳（補件前主管無法核准）</div>
+              <input type="file" id="leave-cert-input" accept="image/*,.pdf" style="display:none" onchange="leaveCertSelected(event)">
+              <button class="btn btn-outline btn-sm" onclick="document.getElementById('leave-cert-input').click()">選擇病單圖片</button>
+              <div id="leave-cert-status" style="font-size:12px;color:var(--muted);margin-top:6px"></div>
+              <img id="leave-cert-preview" style="display:none;max-width:100%;max-height:160px;border-radius:8px;margin-top:8px;border:1px solid var(--border)">
+            </div>
+          </div>
+          <button class="btn btn-primary" style="width:100%;margin-top:16px" onclick="submitLeaveRequest()">送出請假申請</button>
         </div>
 
         <!-- 我的請假記錄 -->
@@ -468,33 +484,27 @@ html,body{min-height:100%;background:var(--navy);font-family:"Noto Sans TC",sans
         <!-- 新增費用申請 -->
         <div class="card" style="margin-bottom:14px">
           <div class="card-header"><span class="card-title">新增費用申請</span></div>
-          <div style="padding:12px 16px">
-            <div style="margin-bottom:10px">
-              <div class="fl">費用日期</div>
-              <input class="fi" type="date" id="exp-date" style="margin-bottom:8px">
+          <div style="padding:16px">
+            <div class="fm-section">
+              <div class="fm-sec-head"><span class="dot"></span><span class="t">費用內容</span><span class="line"></span></div>
+              <div class="fm-grid2" style="margin-bottom:10px">
+                <div><div class="fl">費用日期</div><input class="fi" type="date" id="exp-date" style="margin-bottom:0"></div>
+                <div><div class="fl">費用類型</div>
+                  <select class="fi" id="exp-category" style="margin-bottom:0">
+                    <option value="餐費">餐費</option>
+                    <option value="交通費">交通費</option>
+                    <option value="住宿費">住宿費</option>
+                    <option value="辦公用品">辦公用品</option>
+                    <option value="其他">其他</option>
+                  </select>
+                </div>
+              </div>
+              <div style="margin-bottom:10px"><div class="fl">金額（元）</div><input class="fi" type="number" id="exp-amount" placeholder="0" min="0" style="margin-bottom:0"></div>
+              <div><div class="fl">說明</div><input class="fi" type="text" id="exp-note" placeholder="費用說明（選填）" style="margin-bottom:0"></div>
             </div>
-            <div style="margin-bottom:10px">
-              <div class="fl">費用類型</div>
-              <select class="fi" id="exp-category" style="margin-bottom:8px">
-                <option value="餐費">餐費</option>
-                <option value="交通費">交通費</option>
-                <option value="住宿費">住宿費</option>
-                <option value="辦公用品">辦公用品</option>
-                <option value="其他">其他</option>
-              </select>
-            </div>
-            <div style="margin-bottom:10px">
-              <div class="fl">金額（元）</div>
-              <input class="fi" type="number" id="exp-amount" placeholder="0" min="0" style="margin-bottom:8px">
-            </div>
-            <div style="margin-bottom:10px">
-              <div class="fl">說明</div>
-              <input class="fi" type="text" id="exp-note" placeholder="費用說明（選填）" style="margin-bottom:8px">
-            </div>
-            <!-- 發票/收據上傳 -->
-            <div style="margin-bottom:14px">
-              <div class="fl" style="margin-bottom:6px">發票 / 收據</div>
-              <div id="exp-photo-wrap" style="border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;position:relative;background:var(--bg)" onclick="document.getElementById('exp-photo-input').click()">
+            <div class="fm-section">
+              <div class="fm-sec-head"><span class="dot"></span><span class="t">發票／收據</span><span class="line"></span></div>
+              <div id="exp-photo-wrap" style="border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;position:relative;background:var(--bg);transition:border-color .15s" onclick="document.getElementById('exp-photo-input').click()">
                 <input type="file" id="exp-photo-input" accept="image/*" capture="environment" style="display:none" onchange="expPhotoSelected(event)">
                 <div id="exp-photo-hint" style="color:var(--muted);font-size:13px">
                   <div style="font-size:24px;margin-bottom:6px">📷</div>
@@ -504,7 +514,7 @@ html,body{min-height:100%;background:var(--navy);font-family:"Noto Sans TC",sans
                 <div id="exp-ocr-loading" style="display:none;margin-top:8px;font-size:12px;color:var(--accent)">OCR 辨識中...</div>
               </div>
             </div>
-            <button class="btn btn-primary" style="width:100%" onclick="submitExpense()">送出申請</button>
+            <button class="btn btn-primary" style="width:100%;margin-top:16px" onclick="submitExpense()">送出申請</button>
           </div>
         </div>
 
@@ -2235,7 +2245,8 @@ async function expPhotoSelected(event) {
       if (r.date)         document.getElementById('exp-date').value   = r.date;
       if (r.title)        document.getElementById('exp-note').value   = r.title;
       if (r.document_id)  _expDocumentId = r.document_id;
-      showToast('OCR 自動填入完成', 'ok');
+      if (r.ocr_error) showToast('收據已上傳（自動辨識失敗，請手動填寫）', 'ok');
+      else             showToast('OCR 自動填入完成', 'ok');
     }
   } catch(e) {
     document.getElementById('exp-ocr-loading').style.display = 'none';

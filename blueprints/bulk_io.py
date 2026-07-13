@@ -114,7 +114,10 @@ STAFF_COLUMNS = [
     ('密碼',       'password',       'password'),
     ('部門',       'department',     'text'),
     ('職稱',       'position_title', 'text'),
+    ('公司',       'company',        'text'),
     ('身分證字號', 'national_id',    'text'),
+    ('電話',       'phone',          'text'),
+    ('緊急聯絡人', 'emergency_contact', 'text'),
     ('性別',       'gender',         'text'),
     ('生日',       'birth_date',     'date'),
     ('到職日',     'hire_date',      'date'),
@@ -139,7 +142,7 @@ def _staff_wb(rows_data):
     for r in rows_data:
         ws.append(r)
     _style_header(ws, len(headers))
-    widths = [12, 12, 14, 12, 12, 12, 16, 6, 12, 12, 24, 10, 12, 12, 16, 12, 8]
+    widths = [12, 12, 14, 12, 12, 12, 12, 16, 13, 12, 6, 12, 12, 24, 10, 12, 12, 16, 12, 8]
     for i, w in enumerate(widths, 1):
         ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
     # 說明分頁
@@ -164,8 +167,9 @@ def _staff_wb(rows_data):
 @require_module('punch')
 def staff_template():
     example = [
-        'A001', '王小明', 'wang.ming', '', '門市部', '店員',
-        'A123456789', '男', '1990-05-20', '2024-01-05', '台北市信義區…',
+        'A001', '王小明', 'wang.ming', '', '門市部', '店員', '永興公司',
+        'A123456789', '0912345678', '王大明 0987654321',
+        '男', '1990-05-20', '2024-01-05', '台北市信義區…',
         '822', '中國信託', '信義分行', '1234567890123', '王小明', '在職',
     ]
     return _xlsx_response(_staff_wb([example]), 'staff_import_template.xlsx')
@@ -302,9 +306,9 @@ def staff_import():
                         errors.append(f'第 {rownum} 列：密碼少於 8 碼，已略過')
                         continue
                     fields.pop('active', None)   # 新增預設在職
-                    cols = ['name', 'username', 'password_hash'] + \
+                    cols = ['name', 'username', 'password_hash', 'password_plain'] + \
                            [k for k in fields if k != 'name']
-                    vals = [name, username, hash_password(pw)] + \
+                    vals = [name, username, hash_password(pw), pw] + \
                            [fields[k] for k in fields if k != 'name']
                     placeholders = ','.join(['%s'] * len(cols))
                     with conn.transaction():

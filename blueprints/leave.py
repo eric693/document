@@ -831,8 +831,20 @@ def api_document_image(doc_id):
         return jsonify({'error': '找不到圖片'}), 404
     from flask import Response
     from html import escape as _esc
+    data = str(doc['image_data'])
+
+    # PDF：解回原始 bytes，交給瀏覽器內建 PDF viewer 開啟
+    if data.startswith('data:application/pdf'):
+        import base64 as _b64v
+        try:
+            pdf_bytes = _b64v.b64decode(data.split(',', 1)[1])
+        except Exception:
+            return jsonify({'error': '附件資料損毀'}), 500
+        return Response(pdf_bytes, mimetype='application/pdf',
+                        headers={'Content-Disposition': 'inline; filename="document.pdf"'})
+
     fname = _esc(doc['filename'] or '', quote=True)   # 跳脫檔名，避免惡意檔名造成 XSS
-    src   = doc['image_data'] if str(doc['image_data']).startswith('data:image/') else ''
+    src   = data if data.startswith('data:image/') else ''
     html = (
         '<!doctype html><html><head><meta charset="utf-8">'
         f'<title>{fname}</title>'

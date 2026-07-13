@@ -126,6 +126,27 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
 .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(74,123,218,0.1); background: var(--surface); }
 .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
 
+/* Form sections (員工表單重新設計) */
+.fm-section + .fm-section { margin-top: 24px; }
+.fm-sec-head { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+.fm-sec-head .dot { width:7px; height:7px; border-radius:50%; background:var(--gold); flex-shrink:0; }
+.fm-sec-head .t { font-size:12px; font-weight:700; color:var(--navy); letter-spacing:.1em; white-space:nowrap; }
+.fm-sec-head .line { flex:1; height:1px; background:var(--border); }
+.pw-row { display:flex; gap:8px; align-items:stretch; }
+.pw-row .form-input { flex:1; }
+.pw-gen { padding:0 15px; border:1.5px solid var(--border); border-radius:7px; background:var(--bg); color:var(--navy); font-size:12px; font-weight:600; cursor:pointer; white-space:nowrap; transition:all .15s; font-family:'Noto Sans TC',sans-serif; }
+.pw-gen:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-light); }
+.pw-hint { font-size:11px; color:var(--muted); margin-top:6px; }
+.pw-mask { font-family:'DM Mono',monospace; font-size:12px; letter-spacing:.06em; color:var(--navy); }
+.pw-eye { border:none; background:none; cursor:pointer; font-size:13px; margin-left:6px; opacity:.55; padding:0; vertical-align:middle; }
+.pw-eye:hover { opacity:1; }
+/* 勾選項 pill（表單重新設計共用） */
+.fm-check { display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-size:13px; color:var(--text); padding:9px 16px; border:1.5px solid var(--border); border-radius:8px; background:var(--bg); transition:all .15s; user-select:none; }
+.fm-check:hover { border-color:var(--accent); }
+.fm-check:has(input:checked) { border-color:var(--accent); background:var(--accent-light); color:var(--navy); font-weight:600; }
+.fm-check input { accent-color:var(--accent); }
+.fm-note { font-size:11px; color:var(--muted); margin-top:6px; line-height:1.6; }
+
 /* Toast */
 .toast-wrap { position: fixed; bottom: 24px; right: 24px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
 .toast { padding: 12px 18px; border-radius: 8px; font-size: 13px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,0.15); animation: toastIn 0.25s ease; min-width: 200px; }
@@ -216,7 +237,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <a href="#" class="nav-item"        id="nav-stores"   onclick="showPage('stores',event)" style="display:none">門市管理</a>
     <a href="#" class="nav-item"        id="nav-training" onclick="showPage('training',event)">教育訓練</a>
     <a href="#" class="nav-item"        id="nav-docs" onclick="showPage('docs',event)">文件管理<span class="nav-badge" id="badge-docs" style="display:none"></span></a>
-    <a href="#" class="nav-item"        id="nav-labor-law" onclick="showPage('labor-law',event)">勞基法通知<span class="nav-badge" id="badge-labor-law" style="display:none"></span></a>
+    <a href="#" class="nav-item"        id="nav-labor-law" onclick="showPage('labor-law',event)" style="display:none">勞基法通知<span class="nav-badge" id="badge-labor-law" style="display:none"></span></a>
     <a href="#" class="nav-item"        id="nav-adminmgr" onclick="showPage('adminmgr',event)" style="display:none">帳號管理</a>
   </nav>
   <div class="sidebar-bottom">
@@ -525,8 +546,8 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <div class="card">
         <div class="table-wrap">
           <table>
-            <thead><tr><th style="width:32px"></th><th>姓名</th><th>員工代碼</th><th>部門/職稱</th><th>帳號</th><th>匯款帳號</th><th>狀態</th><th>操作</th></tr></thead>
-            <tbody id="punch-staff-tbody"><tr><td colspan="8" class="empty-state"><div class="empty-state-text">載入中...</div></td></tr></tbody>
+            <thead><tr><th style="width:32px"></th><th>姓名</th><th>員工編號</th><th>部門/職稱</th><th>帳號</th><th>密碼</th><th>匯款帳號</th><th>狀態</th><th>操作</th></tr></thead>
+            <tbody id="punch-staff-tbody"><tr><td colspan="9" class="empty-state"><div class="empty-state-text">載入中...</div></td></tr></tbody>
           </table>
         </div>
       </div>
@@ -2055,44 +2076,37 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
 
     <!-- 新增考核 tab -->
     <div id="perf-panel-new" style="display:none">
-      <div class="card" style="max-width:640px">
+      <div class="card" style="max-width:680px">
         <div class="card-header"><span class="card-title">新增考核記錄</span></div>
-        <div style="padding:20px 24px">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-            <div>
-              <label class="filter-label" style="display:block;margin-bottom:6px">員工</label>
-              <select id="pf-staff" class="form-input" style="width:100%">
-                <option value="">選擇員工</option>
-              </select>
-            </div>
-            <div>
-              <label class="filter-label" style="display:block;margin-bottom:6px">考核範本</label>
-              <select id="pf-template" class="form-input" style="width:100%" onchange="loadPerfTemplateItems()">
-                <option value="">選擇範本</option>
-              </select>
-            </div>
-            <div>
-              <label class="filter-label" style="display:block;margin-bottom:6px">考核期間</label>
-              <input type="month" id="pf-period" class="form-input" style="width:100%">
-            </div>
-            <div>
-              <label class="filter-label" style="display:block;margin-bottom:6px">考核人</label>
-              <input type="text" id="pf-reviewer" class="form-input" style="width:100%" placeholder="考核人姓名">
+        <div style="padding:24px 28px">
+          <div class="fm-section">
+            <div class="fm-sec-head"><span class="dot"></span><span class="t">考核對象</span><span class="line"></span></div>
+            <div class="form-grid">
+              <div class="form-group"><label class="form-label">員工</label>
+                <select id="pf-staff" class="form-input"><option value="">選擇員工</option></select>
+              </div>
+              <div class="form-group"><label class="form-label">考核範本</label>
+                <select id="pf-template" class="form-input" onchange="loadPerfTemplateItems()"><option value="">選擇範本</option></select>
+              </div>
+              <div class="form-group"><label class="form-label">考核期間</label><input type="month" id="pf-period" class="form-input"></div>
+              <div class="form-group"><label class="form-label">考核人</label><input type="text" id="pf-reviewer" class="form-input" placeholder="考核人姓名" style="font-family:'Noto Sans TC',sans-serif"></div>
             </div>
           </div>
-          <div id="pf-items-section" style="margin-bottom:16px;display:none">
-            <div class="filter-label" style="margin-bottom:8px">評分項目</div>
+          <div class="fm-section" id="pf-items-section" style="display:none">
+            <div class="fm-sec-head"><span class="dot"></span><span class="t">評分項目</span><span class="line"></span></div>
             <div id="pf-items-list"></div>
-            <div style="display:flex;justify-content:flex-end;margin-top:8px;font-size:13px;color:var(--muted)">
+            <div style="display:flex;justify-content:flex-end;margin-top:10px;font-size:13px;color:var(--muted)">
               總分：<span id="pf-score-display" style="font-weight:700;color:var(--navy);margin-left:4px">0</span> / <span id="pf-max-display">0</span>
               &nbsp;→&nbsp; 等級：<span id="pf-grade-display" style="font-weight:700;color:var(--accent)">-</span>
             </div>
           </div>
-          <div style="margin-bottom:16px">
-            <label class="filter-label" style="display:block;margin-bottom:6px">備註</label>
-            <textarea id="pf-comments" class="form-input" rows="3" placeholder="考核備註（可選）" style="width:100%;resize:vertical"></textarea>
+          <div class="fm-section">
+            <div class="fm-sec-head"><span class="dot"></span><span class="t">備註</span><span class="line"></span></div>
+            <textarea id="pf-comments" class="form-input" rows="3" placeholder="考核備註（可選）" style="width:100%;resize:vertical;font-family:'Noto Sans TC',sans-serif"></textarea>
           </div>
-          <button class="btn btn-primary" onclick="submitPerfReview()">送出考核</button>
+          <div style="margin-top:20px;display:flex;justify-content:flex-end">
+            <button class="btn btn-primary" onclick="submitPerfReview()">送出考核</button>
+          </div>
         </div>
       </div>
     </div><!-- end perf-panel-new -->
@@ -2208,46 +2222,33 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     </div>
     <div class="modal-body">
       <input type="hidden" id="tm-id">
-      <div class="form-row">
-        <div>
-          <label class="form-label">員工 *</label>
-          <select class="form-input" id="tm-staff" style="width:100%"></select>
-        </div>
-        <div>
-          <label class="form-label">類別 *</label>
-          <select class="form-input" id="tm-category">
-            <option value="food_safety">食品安全</option>
-            <option value="fire_safety">消防安全</option>
-            <option value="first_aid">急救訓練</option>
-            <option value="hygiene">衛生管理</option>
-            <option value="service">服務禮儀</option>
-            <option value="equipment">設備操作</option>
-            <option value="general">一般訓練</option>
-            <option value="other">其他</option>
-          </select>
-        </div>
-      </div>
-      <div style="margin-bottom:12px">
-        <label class="form-label">課程名稱 *</label>
-        <input class="form-input" id="tm-course" placeholder="例：食品安全衛生管理人員訓練" style="width:100%">
-      </div>
-      <div class="form-row">
-        <div>
-          <label class="form-label">完成日期</label>
-          <input type="date" class="form-input" id="tm-completed" style="width:100%">
-        </div>
-        <div>
-          <label class="form-label">到期日期</label>
-          <input type="date" class="form-input" id="tm-expiry" style="width:100%">
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">課程資訊</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">員工 *</label><select class="form-input" id="tm-staff"></select></div>
+          <div class="form-group"><label class="form-label">類別 *</label>
+            <select class="form-input" id="tm-category">
+              <option value="food_safety">食品安全</option>
+              <option value="fire_safety">消防安全</option>
+              <option value="first_aid">急救訓練</option>
+              <option value="hygiene">衛生管理</option>
+              <option value="service">服務禮儀</option>
+              <option value="equipment">設備操作</option>
+              <option value="general">一般訓練</option>
+              <option value="other">其他</option>
+            </select>
+          </div>
+          <div class="form-group full-width"><label class="form-label">課程名稱 *</label><input class="form-input" id="tm-course" placeholder="例：食品安全衛生管理人員訓練"></div>
         </div>
       </div>
-      <div style="margin-bottom:12px">
-        <label class="form-label">證書號碼</label>
-        <input class="form-input" id="tm-cert" placeholder="選填" style="width:100%">
-      </div>
-      <div>
-        <label class="form-label">備註</label>
-        <textarea class="form-input" id="tm-note" rows="2" style="width:100%"></textarea>
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">效期與證書</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">完成日期</label><input type="date" class="form-input" id="tm-completed"></div>
+          <div class="form-group"><label class="form-label">到期日期</label><input type="date" class="form-input" id="tm-expiry"></div>
+          <div class="form-group"><label class="form-label">證書號碼</label><input class="form-input" id="tm-cert" placeholder="選填"></div>
+          <div class="form-group"><label class="form-label">備註</label><input class="form-input" id="tm-note" placeholder="選填"></div>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -2267,28 +2268,21 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div class="modal-body">
       <input type="hidden" id="dcm-staff-id">
       <input type="hidden" id="dcm-type-id">
-      <div id="dcm-auto-hint" style="display:none;background:var(--gray-100,#f3f4f6);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--muted);margin-bottom:12px"></div>
-      <div class="form-row">
-        <div>
-          <label class="form-label">狀態 *</label>
-          <select class="form-input" id="dcm-status" style="width:100%">
-            <option value="received">✓ 已收</option>
-            <option value="missing">✗ 缺件</option>
-            <option value="na">免附（不適用）</option>
-          </select>
+      <div id="dcm-auto-hint" style="display:none;background:var(--accent-light);border-left:3px solid var(--accent);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--navy);margin-bottom:16px;line-height:1.6"></div>
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">收件狀態</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">狀態 *</label>
+            <select class="form-input" id="dcm-status">
+              <option value="received">✓ 已收</option>
+              <option value="missing">✗ 缺件</option>
+              <option value="na">免附（不適用）</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">收件日期</label><input type="date" class="form-input" id="dcm-date"></div>
+          <div class="form-group full-width"><label class="form-label">內容／文件資料</label><input class="form-input" id="dcm-content" placeholder="例：電話號碼、帳號、文件字號（選填）"></div>
+          <div class="form-group full-width"><label class="form-label">備註</label><input class="form-input" id="dcm-note" placeholder="選填"></div>
         </div>
-        <div>
-          <label class="form-label">收件日期</label>
-          <input type="date" class="form-input" id="dcm-date" style="width:100%">
-        </div>
-      </div>
-      <div style="margin-bottom:12px">
-        <label class="form-label">內容／文件資料</label>
-        <input class="form-input" id="dcm-content" placeholder="例：電話號碼、帳號、文件字號（選填）" style="width:100%">
-      </div>
-      <div>
-        <label class="form-label">備註</label>
-        <textarea class="form-input" id="dcm-note" rows="2" style="width:100%" placeholder="選填"></textarea>
       </div>
     </div>
     <div class="modal-footer" style="display:flex;gap:8px">
@@ -2308,30 +2302,27 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     </div>
     <div class="modal-body">
       <input type="hidden" id="dtm-id">
-      <div style="margin-bottom:12px">
-        <label class="form-label">項目名稱 *</label>
-        <input class="form-input" id="dtm-name" placeholder="例：良民證、體檢表、安檢" style="width:100%">
-      </div>
-      <div class="form-row">
-        <div>
-          <label class="form-label">必收項目</label>
-          <select class="form-input" id="dtm-required" style="width:100%">
-            <option value="1">是（缺件列入提醒）</option>
-            <option value="0">否（僅記錄）</option>
-          </select>
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">項目設定</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group full-width"><label class="form-label">項目名稱 *</label><input class="form-input" id="dtm-name" placeholder="例：良民證、體檢表、安檢"></div>
+          <div class="form-group"><label class="form-label">必收項目</label>
+            <select class="form-input" id="dtm-required">
+              <option value="1">是（缺件列入提醒）</option>
+              <option value="0">否（僅記錄）</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">狀態</label>
+            <select class="form-input" id="dtm-active">
+              <option value="1">啟用</option>
+              <option value="0">停用</option>
+            </select>
+          </div>
+          <div class="form-group full-width"><label class="form-label">自動帶入欄位</label>
+            <select class="form-input" id="dtm-field"><option value="">無（手動登記）</option></select>
+            <div class="fm-note">綁定後，員工資料該欄位有值即自動視為「已收」</div>
+          </div>
         </div>
-        <div>
-          <label class="form-label">狀態</label>
-          <select class="form-input" id="dtm-active" style="width:100%">
-            <option value="1">啟用</option>
-            <option value="0">停用</option>
-          </select>
-        </div>
-      </div>
-      <div>
-        <label class="form-label">自動帶入欄位</label>
-        <select class="form-input" id="dtm-field" style="width:100%"><option value="">無（手動登記）</option></select>
-        <div style="font-size:11px;color:var(--muted);margin-top:4px">綁定後，員工資料該欄位有值即自動視為「已收」</div>
       </div>
     </div>
     <div class="modal-footer">
@@ -2361,40 +2352,86 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
 
 <!-- Punch Staff Modal -->
 <div class="modal-overlay" id="punch-staff-modal" style="display:none">
-  <div class="modal" style="max-width:480px">
+  <div class="modal" style="max-width:640px">
     <div class="modal-header"><span class="modal-title" id="psm-title">新增員工</span><button class="modal-close" onclick="closePunchStaffModal()">&times;</button></div>
     <div class="modal-body">
       <input type="hidden" id="psm-id">
-      <div class="form-row">
-        <div><label class="form-label">姓名 *</label><input class="form-input" id="psm-name" placeholder="顯示名稱" oninput="if(!document.getElementById('psm-account-holder').value)document.getElementById('psm-account-holder').value=this.value"></div>
-        <div><label class="form-label">員工代碼</label><input class="form-input" id="psm-code" placeholder="例：EMP001"></div>
-      </div>
-      <div class="form-row">
-        <div><label class="form-label">部門</label><input class="form-input" id="psm-department" placeholder="例：外場、廚房"></div>
-        <div><label class="form-label">職稱</label><input class="form-input" id="psm-role" placeholder="例：服務生、主廚"></div>
-      </div>
-      <div class="form-row">
-        <div><label class="form-label">到職日</label><input class="form-input" type="date" id="psm-hire-date"></div>
-        <div><label class="form-label">生日</label><input class="form-input" type="date" id="psm-birth-date"></div>
-      </div>
-      <div class="form-row">
-        <div><label class="form-label">狀態</label><select class="form-input" id="psm-active"><option value="1">在職</option><option value="0">停用</option></select></div>
-        <div><label class="form-label">登入帳號 *</label><input class="form-input" id="psm-username" placeholder="英文或數字" autocapitalize="none"></div>
-      </div>
-      <div class="form-row">
-        <div style="width:100%"><label class="form-label">密碼 *</label><input class="form-input" id="psm-password" placeholder="登入密碼" type="text" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" style="width:100%"><div style="font-size:11px;color:var(--muted);margin-top:4px" id="psm-pw-hint">新增員工請輸入密碼</div></div>
-      </div>
-      <div style="border-top:1.5px solid var(--border);margin:14px 0 10px;padding-top:12px">
-        <div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px">匯款帳號</div>
-        <div class="form-row">
-          <div><label class="form-label">銀行代碼</label><input class="form-input" id="psm-bank-code" placeholder="例：004" inputmode="numeric"></div>
-          <div><label class="form-label">銀行名稱</label><input class="form-input" id="psm-bank-name" placeholder="例：台灣銀行"></div>
+
+      <!-- 基本資料 -->
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">基本資料</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">姓名 *</label><input class="form-input" id="psm-name" placeholder="員工姓名" style="font-family:'Noto Sans TC',sans-serif" oninput="if(!document.getElementById('psm-account-holder').value)document.getElementById('psm-account-holder').value=this.value"></div>
+          <div class="form-group"><label class="form-label">員工編號</label><input class="form-input" id="psm-code" placeholder="例：EMP001"></div>
+          <div class="form-group"><label class="form-label">公司</label><input class="form-input" id="psm-company" placeholder="例：永興公司" style="font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="form-group"><label class="form-label">部門</label><input class="form-input" id="psm-department" placeholder="例：門市部" style="font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="form-group"><label class="form-label">職稱</label><input class="form-input" id="psm-role" placeholder="例：店員" style="font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="form-group"><label class="form-label">在職狀態</label><select class="form-input" id="psm-active"><option value="1">在職</option><option value="0">停用</option></select></div>
+          <div class="form-group"><label class="form-label">到職日</label><input class="form-input" type="date" id="psm-hire-date"></div>
+          <div class="form-group"><label class="form-label">生日</label><input class="form-input" type="date" id="psm-birth-date"></div>
         </div>
-        <div class="form-row">
-          <div><label class="form-label">分行名稱</label><input class="form-input" id="psm-bank-branch" placeholder="例：信義分行"></div>
-          <div><label class="form-label">帳戶名義人</label><input class="form-input" id="psm-account-holder" placeholder="例：王小明"></div>
+      </div>
+
+      <!-- 個人資料 -->
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">個人資料</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">身分證字號（ID）</label><input class="form-input" id="psm-national-id" placeholder="例：A123456789" autocapitalize="characters"></div>
+          <div class="form-group"><label class="form-label">電話</label><input class="form-input" id="psm-phone" placeholder="例：0912345678" inputmode="tel"></div>
+          <div class="form-group full-width"><label class="form-label">緊急聯絡人</label><input class="form-input" id="psm-emergency" placeholder="例：王大明 0987654321（姓名＋電話）" style="font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="form-group full-width"><label class="form-label">地址</label><input class="form-input" id="psm-address" placeholder="戶籍或通訊地址" style="font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="form-group full-width"><label class="form-label">照片</label>
+            <div style="display:flex;gap:14px;align-items:center">
+              <div id="psm-photo-preview-wrap" style="width:72px;height:72px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">
+                <img id="psm-photo-preview" style="display:none;width:100%;height:100%;object-fit:cover">
+                <span id="psm-photo-placeholder" style="font-size:22px;opacity:.35">👤</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                <div style="display:flex;gap:8px">
+                  <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('psm-photo-input').click()">選擇照片</button>
+                  <button type="button" class="btn btn-ghost btn-sm" id="psm-photo-clear" style="display:none" onclick="clearStaffPhoto()">移除</button>
+                </div>
+                <div class="fm-note" style="margin:0">JPG/PNG，會自動壓縮至 600px</div>
+              </div>
+              <input type="file" id="psm-photo-input" accept="image/*" style="display:none" onchange="staffPhotoSelected(event)">
+            </div>
+          </div>
         </div>
-        <div><label class="form-label">帳號</label><input class="form-input" id="psm-bank-account" placeholder="例：123456789012" inputmode="numeric" style="font-family:'DM Mono',monospace;letter-spacing:.04em"></div>
+      </div>
+
+      <!-- 文件收件 -->
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">文件收件</span><span class="line"></span></div>
+        <div class="fm-note" style="margin:0 0 10px">勾選已收到的文件（與「文件管理」缺件提醒同步）</div>
+        <div id="psm-docs-list" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      </div>
+
+      <!-- 登入資訊 -->
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">登入資訊</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">登入帳號 *</label><input class="form-input" id="psm-username" placeholder="英文或數字" autocapitalize="none" autocorrect="off" spellcheck="false"></div>
+          <div class="form-group">
+            <label class="form-label">密碼 *</label>
+            <div class="pw-row">
+              <input class="form-input" id="psm-password" placeholder="登入密碼" type="text" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false">
+              <button type="button" class="pw-gen" onclick="genStaffPw()" title="隨機產生 8 碼">產生</button>
+            </div>
+            <div class="pw-hint" id="psm-pw-hint">新增員工請設定密碼（至少 8 碼）</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 匯款帳號 -->
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">匯款帳號</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">銀行代碼</label><input class="form-input" id="psm-bank-code" placeholder="例：004" inputmode="numeric"></div>
+          <div class="form-group"><label class="form-label">銀行名稱</label><input class="form-input" id="psm-bank-name" placeholder="例：台灣銀行"></div>
+          <div class="form-group"><label class="form-label">分行名稱</label><input class="form-input" id="psm-bank-branch" placeholder="例：信義分行"></div>
+          <div class="form-group"><label class="form-label">帳戶名義人</label><input class="form-input" id="psm-account-holder" placeholder="例：王小明"></div>
+          <div class="form-group full-width"><label class="form-label">帳號</label><input class="form-input" id="psm-bank-account" placeholder="例：123456789012" inputmode="numeric" style="letter-spacing:.06em"></div>
+        </div>
       </div>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closePunchStaffModal()">取消</button><button class="btn btn-primary" onclick="savePunchStaff()">儲存</button></div>
@@ -2618,54 +2655,44 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     </div>
     <div class="modal-body">
       <input type="hidden" id="ann-id">
-      <div style="margin-bottom:14px">
-        <label class="form-label">標題 *</label>
-        <input class="form-input" id="ann-title" placeholder="公告標題" style="width:100%">
-      </div>
-      <div class="form-row" style="margin-bottom:14px">
-        <div>
-          <label class="form-label">類別</label>
-          <select class="form-input" id="ann-cat" style="width:100%">
-            <option value="general">一般公告</option>
-            <option value="hr">人事公告</option>
-            <option value="event">活動通知</option>
-            <option value="urgent">緊急公告</option>
-            <option value="policy">制度政策</option>
-            <option value="labor_law">勞基法修正</option>
-          </select>
-        </div>
-        <div>
-          <label class="form-label">優先度</label>
-          <select class="form-input" id="ann-priority" style="width:100%">
-            <option value="normal">一般</option>
-            <option value="important">重要</option>
-            <option value="urgent">緊急</option>
-          </select>
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">公告內容</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group full-width"><label class="form-label">標題 *</label><input class="form-input" id="ann-title" placeholder="公告標題" style="font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="form-group full-width"><label class="form-label">內容 *</label>
+            <textarea class="form-input" id="ann-content" rows="6"
+              style="resize:vertical;min-height:130px;font-family:'Noto Sans TC',sans-serif;font-size:14px;line-height:1.7"
+              placeholder="公告內容…"></textarea>
+          </div>
         </div>
       </div>
-      <div style="margin-bottom:14px">
-        <label class="form-label">內容 *</label>
-        <textarea class="form-input" id="ann-content" rows="6"
-          style="width:100%;resize:vertical;min-height:120px;font-family:'Noto Sans TC',sans-serif;font-size:14px;line-height:1.7"
-          placeholder="公告內容…"></textarea>
-      </div>
-      <div class="form-row" style="margin-bottom:14px">
-        <div>
-          <label class="form-label">發布人</label>
-          <input class="form-input" id="ann-author" placeholder="管理員" style="width:100%">
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">發布設定</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">類別</label>
+            <select class="form-input" id="ann-cat">
+              <option value="general">一般公告</option>
+              <option value="hr">人事公告</option>
+              <option value="event">活動通知</option>
+              <option value="urgent">緊急公告</option>
+              <option value="policy">制度政策</option>
+              <option value="labor_law">勞基法修正</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">優先度</label>
+            <select class="form-input" id="ann-priority">
+              <option value="normal">一般</option>
+              <option value="important">重要</option>
+              <option value="urgent">緊急</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">發布人</label><input class="form-input" id="ann-author" placeholder="管理員" style="font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="form-group"><label class="form-label">到期日（留空＝永不過期）</label><input class="form-input" type="datetime-local" id="ann-expires"></div>
+          <div class="form-group full-width" style="flex-direction:row;gap:12px">
+            <label class="fm-check"><input type="checkbox" id="ann-pinned"> 📌 置頂公告</label>
+            <label class="fm-check"><input type="checkbox" id="ann-active" checked> 立即上架</label>
+          </div>
         </div>
-        <div>
-          <label class="form-label">到期日（留空=永不過期）</label>
-          <input class="form-input" type="datetime-local" id="ann-expires" style="width:100%">
-        </div>
-      </div>
-      <div style="display:flex;gap:20px;flex-wrap:wrap">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
-          <input type="checkbox" id="ann-pinned"> 置頂公告
-        </label>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
-          <input type="checkbox" id="ann-active" checked> 立即上架
-        </label>
       </div>
     </div>
     <div class="modal-footer">
@@ -2681,26 +2708,31 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div class="modal-header"><span class="modal-title" id="lam-title">管理員代填請假</span><button class="modal-close" onclick="closeLeaveAdminModal()">&times;</button></div>
     <div class="modal-body">
       <input type="hidden" id="lam-id">
-      <div class="form-row">
-        <div><label class="form-label">員工 *</label><select class="form-input" id="lam-staff" style="width:100%"></select></div>
-        <div><label class="form-label">假別 *</label><select class="form-input" id="lam-type" style="width:100%"></select></div>
-      </div>
-      <div class="form-row">
-        <div><label class="form-label">開始日期 *</label><input class="form-input" type="date" id="lam-start"></div>
-        <div><label class="form-label">結束日期 *</label><input class="form-input" type="date" id="lam-end"></div>
-      </div>
-      <div class="form-row" style="margin-bottom:8px">
-        <div><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="lam-start-half"> <span class="form-label" style="margin:0">開始日半天</span></label></div>
-        <div><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="lam-end-half"> <span class="form-label" style="margin:0">結束日半天</span></label></div>
-      </div>
-      <div style="margin-bottom:12px">
-        <label class="form-label">請假時數（選填，填寫後以小時計算，忽略結束日）</label>
-        <div style="display:flex;align-items:center;gap:8px">
-          <input class="form-input" type="number" id="lam-hours" min="0.5" max="8" step="0.5" placeholder="例：2（留空則依天數）" style="width:180px">
-          <span style="font-size:12px;color:var(--muted)">小時（0.5～8）</span>
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">請假對象</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">員工 *</label><select class="form-input" id="lam-staff"></select></div>
+          <div class="form-group"><label class="form-label">假別 *</label><select class="form-input" id="lam-type"></select></div>
         </div>
       </div>
-      <div id="lam-days-preview" style="font-size:13px;color:var(--accent);margin-bottom:12px;min-height:18px"></div>
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">請假期間</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">開始日期 *</label><input class="form-input" type="date" id="lam-start"></div>
+          <div class="form-group"><label class="form-label">結束日期 *</label><input class="form-input" type="date" id="lam-end"></div>
+          <div class="form-group full-width" style="flex-direction:row;gap:12px">
+            <label class="fm-check"><input type="checkbox" id="lam-start-half"> 開始日半天</label>
+            <label class="fm-check"><input type="checkbox" id="lam-end-half"> 結束日半天</label>
+          </div>
+          <div class="form-group full-width"><label class="form-label">請假時數（選填，填寫後以小時計算，忽略結束日）</label>
+            <div style="display:flex;align-items:center;gap:10px">
+              <input class="form-input" type="number" id="lam-hours" min="0.5" max="8" step="0.5" placeholder="例：2（留空則依天數）" style="width:200px">
+              <span style="font-size:12px;color:var(--muted)">小時（0.5～8）</span>
+            </div>
+          </div>
+        </div>
+        <div id="lam-days-preview" style="font-size:13px;color:var(--accent);margin-top:10px;min-height:18px"></div>
+      </div>
       <!-- 病單上傳區：依假別 require_cert 動態顯示 -->
       <div id="lam-cert-section" style="display:none;margin-bottom:14px;padding:14px;background:#f8f9fc;border-radius:10px;border:1.5px dashed var(--border)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -2721,8 +2753,13 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
           <div id="lam-cert-uploading" style="display:none;font-size:12px;color:var(--muted);margin-top:6px">上傳中...</div>
         </div>
       </div>
-      <div style="margin-bottom:12px"><label class="form-label">狀態</label><select class="form-input" id="lam-status" style="width:auto"><option value="approved">直接核准</option><option value="pending">待審核</option></select></div>
-      <div><label class="form-label">原因/備註</label><input class="form-input" id="lam-reason" placeholder="選填" style="width:100%"></div>
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">審核與備註</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">狀態</label><select class="form-input" id="lam-status"><option value="approved">直接核准</option><option value="pending">待審核</option></select></div>
+          <div class="form-group"><label class="form-label">原因／備註</label><input class="form-input" id="lam-reason" placeholder="選填" style="font-family:'Noto Sans TC',sans-serif"></div>
+        </div>
+      </div>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeLeaveAdminModal()">取消</button><button class="btn btn-primary" onclick="saveLeaveAdmin()">儲存</button></div>
   </div>
@@ -2756,25 +2793,26 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div class="modal-header"><span class="modal-title" id="ltm-title">新增假別</span><button class="modal-close" onclick="closeLeaveTypeModal()">&times;</button></div>
     <div class="modal-body">
       <input type="hidden" id="ltm-id">
-      <div class="form-row">
-        <div><label class="form-label">假別名稱 *</label><input class="form-input" id="ltm-name" placeholder="例：特休假"></div>
-        <div><label class="form-label">代碼 *</label><input class="form-input" id="ltm-code" placeholder="例：annual" autocapitalize="none"></div>
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">假別資訊</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">假別名稱 *</label><input class="form-input" id="ltm-name" placeholder="例：特休假" style="font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="form-group"><label class="form-label">代碼 *</label><input class="form-input" id="ltm-code" placeholder="例：annual" autocapitalize="none"></div>
+          <div class="form-group"><label class="form-label">顏色</label><input type="color" id="ltm-color" value="#4a7bda" style="width:100%;height:41px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;background:var(--bg)"></div>
+          <div class="form-group"><label class="form-label">狀態</label><select class="form-input" id="ltm-active"><option value="1">啟用</option><option value="0">停用</option></select></div>
+          <div class="form-group full-width"><label class="form-label">說明（選填）</label><input class="form-input" id="ltm-desc" style="font-family:'Noto Sans TC',sans-serif"></div>
+        </div>
       </div>
-      <div class="form-row">
-        <div><label class="form-label">薪資倍率</label><input class="form-input" type="number" id="ltm-pay" min="0" max="2" step="0.1" value="1.0"><div style="font-size:11px;color:var(--muted);margin-top:3px">0=無薪、0.5=半薪、1=全薪</div></div>
-        <div><label class="form-label">年度上限（天）</label><input class="form-input" type="number" id="ltm-max" min="0" placeholder="空白=無限制"></div>
-      </div>
-      <div class="form-row">
-        <div><label class="form-label">顏色</label><input type="color" id="ltm-color" value="#4a7bda" style="width:100%;height:38px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer"></div>
-        <div><label class="form-label">狀態</label><select class="form-input" id="ltm-active"><option value="1">啟用</option><option value="0">停用</option></select></div>
-      </div>
-      <div><label class="form-label">說明（選填）</label><input class="form-input" id="ltm-desc" style="width:100%"></div>
-      <div style="margin-top:12px">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-          <input type="checkbox" id="ltm-require-cert" style="width:16px;height:16px;accent-color:var(--accent)">
-          <span class="form-label" style="margin:0">申請此假別需上傳病單 / 證明文件</span>
-        </label>
-        <div style="font-size:11px;color:var(--muted);margin-top:4px;margin-left:24px">勾選後，管理員審核核准前必須確認已上傳病單</div>
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">計薪與限制</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">薪資倍率</label><input class="form-input" type="number" id="ltm-pay" min="0" max="2" step="0.1" value="1.0"><div class="fm-note">0＝無薪、0.5＝半薪、1＝全薪</div></div>
+          <div class="form-group"><label class="form-label">年度上限（天）</label><input class="form-input" type="number" id="ltm-max" min="0" placeholder="空白＝無限制"></div>
+          <div class="form-group full-width">
+            <label class="fm-check"><input type="checkbox" id="ltm-require-cert"> 申請此假別需上傳病單／證明文件</label>
+            <div class="fm-note">勾選後，管理員審核核准前必須確認已上傳病單</div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="modal-footer"><button class="btn btn-outline" onclick="closeLeaveTypeModal()">取消</button><button class="btn btn-primary" onclick="saveLeaveType()">儲存</button></div>
@@ -2887,28 +2925,28 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div class="modal-header"><span class="modal-title" id="frm-title">新增收支記錄</span><button class="modal-close" onclick="closeFinRecModal()">&times;</button></div>
     <div class="modal-body">
       <input type="hidden" id="frm-id">
-      <div class="form-row">
-        <div><label class="form-label">日期 *</label><input class="form-input" type="date" id="frm-date"></div>
-        <div><label class="form-label">類型</label>
-          <select class="form-input" id="frm-type" onchange="renderFinCatOptions()">
-            <option value="income">收入</option><option value="expense">支出</option>
-          </select>
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">收支內容</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">日期 *</label><input class="form-input" type="date" id="frm-date"></div>
+          <div class="form-group"><label class="form-label">類型</label>
+            <select class="form-input" id="frm-type" onchange="renderFinCatOptions()">
+              <option value="income">收入</option><option value="expense">支出</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">類別</label><select class="form-input" id="frm-cat"></select></div>
+          <div class="form-group"><label class="form-label">金額 *</label><input class="form-input" type="number" id="frm-amount" min="0" step="1" placeholder="0"></div>
+          <div class="form-group full-width"><label class="form-label">標題 *</label><input class="form-input" id="frm-title-input" placeholder="例：食材採購、客桌消費" style="font-family:'Noto Sans TC',sans-serif"></div>
         </div>
       </div>
-      <div class="form-row">
-        <div><label class="form-label">類別</label><select class="form-input" id="frm-cat"></select></div>
-        <div><label class="form-label">金額 *</label><input class="form-input" type="number" id="frm-amount" min="0" step="1" placeholder="0"></div>
-      </div>
-      <div class="form-row">
-        <div class="full-width"><label class="form-label">標題 *</label><input class="form-input" id="frm-title-input" placeholder="例：食材採購、客桌消費"></div>
-      </div>
-      <div class="form-row">
-        <div><label class="form-label">廠商/店家</label><input class="form-input" id="frm-vendor" placeholder="選填"></div>
-        <div><label class="form-label">發票/單據號碼</label><input class="form-input" id="frm-invoice" placeholder="選填"></div>
-      </div>
-      <div class="form-row">
-        <div><label class="form-label">稅額</label><input class="form-input" type="number" id="frm-tax" min="0" step="1" value="0"></div>
-        <div><label class="form-label">備註</label><input class="form-input" id="frm-note" placeholder="選填"></div>
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">單據明細</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">廠商／店家</label><input class="form-input" id="frm-vendor" placeholder="選填" style="font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="form-group"><label class="form-label">發票／單據號碼</label><input class="form-input" id="frm-invoice" placeholder="選填"></div>
+          <div class="form-group"><label class="form-label">稅額</label><input class="form-input" type="number" id="frm-tax" min="0" step="1" value="0"></div>
+          <div class="form-group"><label class="form-label">備註</label><input class="form-input" id="frm-note" placeholder="選填" style="font-family:'Noto Sans TC',sans-serif"></div>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -2924,28 +2962,29 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div class="modal-header"><span class="modal-title" id="fcm-title">新增類別</span><button class="modal-close" onclick="closeFinCatModal()">&times;</button></div>
     <div class="modal-body">
       <input type="hidden" id="fcm-id">
-      <div class="form-row">
-        <div><label class="form-label">名稱 *</label><input class="form-input" id="fcm-name" placeholder="例：食材成本"></div>
-        <div><label class="form-label">類型</label><select class="form-input" id="fcm-type"><option value="income">收入</option><option value="expense">支出</option></select></div>
-      </div>
-      <div class="form-row">
-        <div><label class="form-label">顏色</label><input type="color" id="fcm-color" value="#4a7bda" style="width:100%;height:38px;border:1.5px solid var(--border);border-radius:8px;cursor:pointer"></div>
-        <div><label class="form-label">排序</label><input class="form-input" type="number" id="fcm-sort" value="0"></div>
-      </div>
-      <div><label class="form-label">狀態</label><select class="form-input" id="fcm-active"><option value="1">啟用</option><option value="0">停用</option></select></div>
-      <div>
-        <label class="form-label">報表科目 <span style="font-size:11px;font-weight:400;color:var(--muted)">（影響三大財務報表）</span></label>
-        <select class="form-input" id="fcm-section">
-          <optgroup label="── 收入 ──">
-            <option value="operating_revenue">營業收入</option>
-            <option value="other_revenue">營業外收入</option>
-          </optgroup>
-          <optgroup label="── 支出 ──">
-            <option value="cogs">營業成本</option>
-            <option value="operating_expense">營業費用</option>
-            <option value="other_expense">營業外費用</option>
-          </optgroup>
-        </select>
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">類別設定</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">名稱 *</label><input class="form-input" id="fcm-name" placeholder="例：食材成本" style="font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="form-group"><label class="form-label">類型</label><select class="form-input" id="fcm-type"><option value="income">收入</option><option value="expense">支出</option></select></div>
+          <div class="form-group"><label class="form-label">顏色</label><input type="color" id="fcm-color" value="#4a7bda" style="width:100%;height:41px;border:1.5px solid var(--border);border-radius:7px;cursor:pointer;background:var(--bg)"></div>
+          <div class="form-group"><label class="form-label">排序</label><input class="form-input" type="number" id="fcm-sort" value="0"></div>
+          <div class="form-group"><label class="form-label">狀態</label><select class="form-input" id="fcm-active"><option value="1">啟用</option><option value="0">停用</option></select></div>
+          <div class="form-group"><label class="form-label">報表科目</label>
+            <select class="form-input" id="fcm-section">
+              <optgroup label="── 收入 ──">
+                <option value="operating_revenue">營業收入</option>
+                <option value="other_revenue">營業外收入</option>
+              </optgroup>
+              <optgroup label="── 支出 ──">
+                <option value="cogs">營業成本</option>
+                <option value="operating_expense">營業費用</option>
+                <option value="other_expense">營業外費用</option>
+              </optgroup>
+            </select>
+            <div class="fm-note">影響三大財務報表的歸類</div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -3050,48 +3089,33 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     </div>
     <div class="modal-body">
       <input type="hidden" id="apm-id">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div>
-          <label class="form-label">類型</label>
-          <select class="form-input" id="apm-type">
-            <option value="payable">應付帳款</option>
-            <option value="receivable">應收帳款</option>
-          </select>
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">帳款內容</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">類型</label>
+            <select class="form-input" id="apm-type">
+              <option value="payable">應付帳款</option>
+              <option value="receivable">應收帳款</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">狀態</label>
+            <select class="form-input" id="apm-status">
+              <option value="open">未結清</option>
+              <option value="paid">已結清</option>
+            </select>
+          </div>
+          <div class="form-group full-width"><label class="form-label">標題 *</label><input class="form-input" id="apm-title-input" placeholder="例：3月份水電費" style="font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="form-group"><label class="form-label">往來對象</label><input class="form-input" id="apm-party" placeholder="廠商／客戶名稱" style="font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="form-group"><label class="form-label">發票號碼</label><input class="form-input" id="apm-invoice"></div>
+          <div class="form-group"><label class="form-label">金額 *</label><input class="form-input" id="apm-amount" type="number" min="0" placeholder="0"></div>
         </div>
-        <div>
-          <label class="form-label">狀態</label>
-          <select class="form-input" id="apm-status">
-            <option value="open">未結清</option>
-            <option value="paid">已結清</option>
-          </select>
-        </div>
-        <div style="grid-column:1/-1">
-          <label class="form-label">標題 *</label>
-          <input class="form-input" id="apm-title-input" placeholder="例：3月份水電費">
-        </div>
-        <div>
-          <label class="form-label">往來對象</label>
-          <input class="form-input" id="apm-party" placeholder="廠商 / 客戶名稱">
-        </div>
-        <div>
-          <label class="form-label">發票號碼</label>
-          <input class="form-input" id="apm-invoice">
-        </div>
-        <div>
-          <label class="form-label">金額 *</label>
-          <input class="form-input" id="apm-amount" type="number" min="0" placeholder="0">
-        </div>
-        <div>
-          <label class="form-label">到期日</label>
-          <input class="form-input" id="apm-due" type="date">
-        </div>
-        <div id="apm-paid-date-wrap">
-          <label class="form-label">結清日期</label>
-          <input class="form-input" id="apm-paid" type="date">
-        </div>
-        <div style="grid-column:1/-1">
-          <label class="form-label">備註</label>
-          <input class="form-input" id="apm-note" placeholder="備註">
+      </div>
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">期限與結清</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">到期日</label><input class="form-input" id="apm-due" type="date"></div>
+          <div class="form-group" id="apm-paid-date-wrap"><label class="form-label">結清日期</label><input class="form-input" id="apm-paid" type="date"></div>
+          <div class="form-group full-width"><label class="form-label">備註</label><input class="form-input" id="apm-note" placeholder="選填" style="font-family:'Noto Sans TC',sans-serif"></div>
         </div>
       </div>
     </div>
@@ -3128,57 +3152,36 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     </div>
     <div class="modal-body">
       <input type="hidden" id="rm-id">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div style="grid-column:1/-1">
-          <label class="form-label">標題 *</label>
-          <input class="form-input" id="rm-title-input" placeholder="例：月租金">
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">分錄內容</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group full-width"><label class="form-label">標題 *</label><input class="form-input" id="rm-title-input" placeholder="例：月租金" style="font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="form-group"><label class="form-label">類型</label>
+            <select class="form-input" id="rm-type" onchange="renderRecurringCatOptions()">
+              <option value="expense">支出</option>
+              <option value="income">收入</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">類別</label><select class="form-input" id="rm-cat"><option value="">未分類</option></select></div>
+          <div class="form-group"><label class="form-label">金額 *</label><input class="form-input" id="rm-amount" type="number" min="0" placeholder="0"></div>
+          <div class="form-group"><label class="form-label">稅額</label><input class="form-input" id="rm-tax" type="number" min="0" placeholder="0"></div>
+          <div class="form-group full-width"><label class="form-label">廠商</label><input class="form-input" id="rm-vendor" placeholder="廠商名稱" style="font-family:'Noto Sans TC',sans-serif"></div>
         </div>
-        <div>
-          <label class="form-label">類型</label>
-          <select class="form-input" id="rm-type" onchange="renderRecurringCatOptions()">
-            <option value="expense">支出</option>
-            <option value="income">收入</option>
-          </select>
-        </div>
-        <div>
-          <label class="form-label">類別</label>
-          <select class="form-input" id="rm-cat"><option value="">未分類</option></select>
-        </div>
-        <div>
-          <label class="form-label">金額 *</label>
-          <input class="form-input" id="rm-amount" type="number" min="0" placeholder="0">
-        </div>
-        <div>
-          <label class="form-label">稅額</label>
-          <input class="form-input" id="rm-tax" type="number" min="0" placeholder="0">
-        </div>
-        <div>
-          <label class="form-label">廠商</label>
-          <input class="form-input" id="rm-vendor" placeholder="廠商名稱">
-        </div>
-        <div>
-          <label class="form-label">頻率</label>
-          <select class="form-input" id="rm-frequency">
-            <option value="monthly">每月</option>
-            <option value="quarterly">每季</option>
-            <option value="yearly">每年</option>
-          </select>
-        </div>
-        <div>
-          <label class="form-label">每次產生日（幾號）</label>
-          <input class="form-input" id="rm-day" type="number" min="1" max="28" value="1">
-        </div>
-        <div>
-          <label class="form-label">開始日期 *</label>
-          <input class="form-input" id="rm-start" type="date">
-        </div>
-        <div>
-          <label class="form-label">結束日期（選填）</label>
-          <input class="form-input" id="rm-end" type="date">
-        </div>
-        <div style="grid-column:1/-1">
-          <label class="form-label">備註</label>
-          <input class="form-input" id="rm-note" placeholder="備註">
+      </div>
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">產生週期</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">頻率</label>
+            <select class="form-input" id="rm-frequency">
+              <option value="monthly">每月</option>
+              <option value="quarterly">每季</option>
+              <option value="yearly">每年</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">每次產生日（幾號）</label><input class="form-input" id="rm-day" type="number" min="1" max="28" value="1"></div>
+          <div class="form-group"><label class="form-label">開始日期 *</label><input class="form-input" id="rm-start" type="date"></div>
+          <div class="form-group"><label class="form-label">結束日期（選填）</label><input class="form-input" id="rm-end" type="date"></div>
+          <div class="form-group full-width"><label class="form-label">備註</label><input class="form-input" id="rm-note" placeholder="選填" style="font-family:'Noto Sans TC',sans-serif"></div>
         </div>
       </div>
     </div>
@@ -3227,24 +3230,26 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div class="modal-header"><span class="modal-title" id="aam-title">新增帳號</span><button class="modal-close" onclick="closeAdminAccModal()">&times;</button></div>
     <div class="modal-body">
       <input type="hidden" id="aam-id">
-      <div class="form-row">
-        <div><label class="form-label">帳號 *</label><input class="form-input" id="aam-username" placeholder="英文/數字" autocapitalize="none"></div>
-        <div><label class="form-label">顯示名稱</label><input class="form-input" id="aam-display" placeholder="選填"></div>
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">帳號資訊</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group"><label class="form-label">帳號 *</label><input class="form-input" id="aam-username" placeholder="英文/數字" autocapitalize="none"></div>
+          <div class="form-group"><label class="form-label">顯示名稱</label><input class="form-input" id="aam-display" placeholder="選填" style="font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="form-group"><label class="form-label">密碼</label><input class="form-input" type="text" id="aam-password" placeholder="新增必填，編輯留空不改" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"><div class="fm-note" id="aam-pw-hint"></div></div>
+          <div class="form-group"><label class="form-label">狀態</label><select class="form-input" id="aam-active"><option value="1">啟用</option><option value="0">停用</option></select></div>
+        </div>
       </div>
-      <div class="form-row">
-        <div><label class="form-label">密碼</label><input class="form-input" type="text" id="aam-password" placeholder="新增必填，編輯留空不改" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false"><div style="font-size:11px;color:var(--muted);margin-top:3px" id="aam-pw-hint"></div></div>
-        <div><label class="form-label">狀態</label><select class="form-input" id="aam-active"><option value="1">啟用</option><option value="0">停用</option></select></div>
-      </div>
-      <div style="margin-bottom:14px">
-        <label class="form-label" style="margin-bottom:4px">帳號類型</label>
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
-          <input type="checkbox" id="aam-is-super" style="width:15px;height:15px;accent-color:var(--green)">
-          超級管理員（可存取全部模組 + 管理其他帳號）
-        </label>
-      </div>
-      <div id="aam-perms-wrap">
-        <label class="form-label" style="margin-bottom:8px;display:block">可存取的模組 <span style="font-weight:400;color:var(--muted);font-size:12px">（超級管理員不受此限）</span></label>
-        <div style="display:flex;flex-wrap:wrap;gap:8px 20px;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px" id="aam-perms-list"></div>
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">權限設定</span><span class="line"></span></div>
+        <div class="form-grid">
+          <div class="form-group full-width">
+            <label class="fm-check"><input type="checkbox" id="aam-is-super" style="accent-color:var(--green)"> ⭐ 超級管理員（可存取全部模組＋管理其他帳號）</label>
+          </div>
+          <div class="form-group full-width" id="aam-perms-wrap">
+            <label class="form-label">可存取的模組 <span style="font-weight:400;text-transform:none;letter-spacing:0">（超級管理員不受此限）</span></label>
+            <div style="display:flex;flex-wrap:wrap;gap:8px 20px;padding:12px 14px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg)" id="aam-perms-list"></div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="modal-footer">
@@ -4502,7 +4507,13 @@ async function loadPunchStaff() {
   populateDeptSelect('ps-dept', punchStaffList);
   renderPunchStaff();
   initStaffDragSort();
+  if (!punchDocItems.length) {
+    const r = await api('/api/punch/doc-items', {}, true);
+    if (r.ok) punchDocItems = r.data;
+  }
 }
+let punchDocItems = [];   // 文件收件勾選項（文件管理的手動項目）
+let _staffPhotoData = null;  // null=不變更、''=清除、data URI=更新
 function initStaffDragSort() {
   const tb = document.getElementById('punch-staff-tbody');
   let dragSrc = null;
@@ -4539,21 +4550,31 @@ function initStaffDragSort() {
 
 function openPunchStaffModal(id=null) {
   punchEditStaffId = id;
+  _staffPhotoData = null;
   document.getElementById('psm-title').textContent = id ? '編輯員工' : '新增員工';
-  const allFields = ['psm-bank-code','psm-bank-name','psm-bank-branch','psm-bank-account','psm-account-holder','psm-department','psm-hire-date','psm-birth-date'];
-  if (id) {
-    const s = punchStaffList.find(x => x.id === id); if (!s) return;
+  const allFields = ['psm-bank-code','psm-bank-name','psm-bank-branch','psm-bank-account','psm-account-holder','psm-department','psm-hire-date','psm-birth-date',
+                     'psm-company','psm-national-id','psm-phone','psm-emergency','psm-address'];
+  const s = id ? punchStaffList.find(x => x.id === id) : null;
+  if (id && !s) return;
+  if (s) {
     document.getElementById('psm-id').value             = s.id;
     document.getElementById('psm-name').value           = s.name;
     document.getElementById('psm-code').value           = s.employee_code || '';
+    document.getElementById('psm-company').value        = s.company || '';
     document.getElementById('psm-department').value     = s.department || '';
     document.getElementById('psm-role').value           = s.role || '';
     document.getElementById('psm-hire-date').value      = s.hire_date || '';
     document.getElementById('psm-birth-date').value     = s.birth_date || '';
+    document.getElementById('psm-national-id').value    = s.national_id || '';
+    document.getElementById('psm-phone').value          = s.phone || '';
+    document.getElementById('psm-emergency').value      = s.emergency_contact || '';
+    document.getElementById('psm-address').value        = s.address || '';
     document.getElementById('psm-username').value       = s.username || '';
     document.getElementById('psm-active').value         = s.active ? '1' : '0';
-    document.getElementById('psm-password').value       = '';
-    document.getElementById('psm-pw-hint').textContent  = '留空表示不修改密碼';
+    document.getElementById('psm-password').value       = s.password_plain || '';
+    document.getElementById('psm-pw-hint').textContent  = s.password_plain
+      ? '目前密碼如上（可直接檢視／修改）；留空＝不變更'
+      : '此員工尚未設定密碼，可自行輸入或點「產生」';
     document.getElementById('psm-bank-code').value      = s.bank_code     || '';
     document.getElementById('psm-bank-name').value      = s.bank_name     || '';
     document.getElementById('psm-bank-branch').value    = s.bank_branch   || '';
@@ -4562,23 +4583,95 @@ function openPunchStaffModal(id=null) {
   } else {
     ['psm-id','psm-name','psm-code','psm-role','psm-username','psm-password',...allFields].forEach(i => document.getElementById(i).value = '');
     document.getElementById('psm-active').value = '1';
-    document.getElementById('psm-pw-hint').textContent = '新增員工請輸入密碼';
+    document.getElementById('psm-pw-hint').textContent = '新增員工請設定密碼（至少 8 碼），可點「產生」';
+  }
+  // 照片預覽
+  const img = document.getElementById('psm-photo-preview');
+  const ph  = document.getElementById('psm-photo-placeholder');
+  const clr = document.getElementById('psm-photo-clear');
+  if (s && s.has_photo) {
+    img.src = `/api/punch/staff/${s.id}/photo?t=${Date.now()}`;
+    img.style.display = ''; ph.style.display = 'none'; clr.style.display = '';
+  } else {
+    img.style.display = 'none'; img.src = ''; ph.style.display = ''; clr.style.display = 'none';
+  }
+  document.getElementById('psm-photo-input').value = '';
+  // 文件收件勾選
+  const docWrap = document.getElementById('psm-docs-list');
+  if (punchDocItems.length) {
+    const st = (s && s.doc_status) || {};
+    docWrap.innerHTML = punchDocItems.map(t =>
+      `<label class="fm-check" style="font-size:12px"><input type="checkbox" class="psm-doc-cb" data-doc-name="${escHtml(t.name)}" ${st[t.name]==='received' ? 'checked' : ''}> ${escHtml(t.name)}</label>`
+    ).join('');
+  } else {
+    docWrap.innerHTML = '<span style="font-size:12px;color:var(--muted)">（無需勾選的文件項目）</span>';
   }
   document.getElementById('punch-staff-modal').style.display = 'flex';
 }
+
+function staffPhotoSelected(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const imgEl = new Image();
+    imgEl.onload = () => {
+      // 壓縮至最長邊 600px JPEG，控制資料量
+      const MAX = 600;
+      const scale = Math.min(1, MAX / Math.max(imgEl.width, imgEl.height));
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(imgEl.width * scale); cv.height = Math.round(imgEl.height * scale);
+      cv.getContext('2d').drawImage(imgEl, 0, 0, cv.width, cv.height);
+      _staffPhotoData = cv.toDataURL('image/jpeg', 0.85);
+      const img = document.getElementById('psm-photo-preview');
+      img.src = _staffPhotoData; img.style.display = '';
+      document.getElementById('psm-photo-placeholder').style.display = 'none';
+      document.getElementById('psm-photo-clear').style.display = '';
+    };
+    imgEl.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function clearStaffPhoto() {
+  _staffPhotoData = '';
+  const img = document.getElementById('psm-photo-preview');
+  img.style.display = 'none'; img.src = '';
+  document.getElementById('psm-photo-placeholder').style.display = '';
+  document.getElementById('psm-photo-clear').style.display = 'none';
+  document.getElementById('psm-photo-input').value = '';
+}
 function closePunchStaffModal() { document.getElementById('punch-staff-modal').style.display = 'none'; }
+function genStaffPw() {
+  const a = '23456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz';
+  let p = ''; for (let i = 0; i < 8; i++) p += a[Math.floor(Math.random() * a.length)];
+  const el = document.getElementById('psm-password'); el.value = p; el.focus();
+}
+function togglePw(sid) {
+  const el = document.getElementById('pw' + sid); if (!el) return;
+  const s = punchStaffList.find(x => x.id === sid);
+  const shown = el.dataset.shown === '1';
+  el.textContent = shown ? '••••••' : (s && s.password_plain ? s.password_plain : '—');
+  el.dataset.shown = shown ? '0' : '1';
+}
 async function savePunchStaff() {
   const id  = document.getElementById('psm-id').value;
   const pw  = document.getElementById('psm-password').value;
   if (!id && !pw)        { showToast('請設定密碼', 'error'); return; }
+  const documents = {};
+  document.querySelectorAll('.psm-doc-cb').forEach(cb => { documents[cb.dataset.docName] = cb.checked; });
   const body = {
     name:           document.getElementById('psm-name').value.trim(),
     employee_code:  document.getElementById('psm-code').value.trim() || null,
+    company:        document.getElementById('psm-company').value.trim(),
     department:     document.getElementById('psm-department').value.trim(),
     username:       document.getElementById('psm-username').value.trim(),
     role:           document.getElementById('psm-role').value.trim(),
     hire_date:      document.getElementById('psm-hire-date').value || null,
     birth_date:     document.getElementById('psm-birth-date').value || null,
+    national_id:    document.getElementById('psm-national-id').value.trim(),
+    phone:          document.getElementById('psm-phone').value.trim(),
+    emergency_contact: document.getElementById('psm-emergency').value.trim(),
+    address:        document.getElementById('psm-address').value.trim(),
     password:       pw,
     active:         document.getElementById('psm-active').value === '1',
     bank_code:      document.getElementById('psm-bank-code').value.trim(),
@@ -4586,7 +4679,9 @@ async function savePunchStaff() {
     bank_branch:    document.getElementById('psm-bank-branch').value.trim(),
     bank_account:   document.getElementById('psm-bank-account').value.trim(),
     account_holder: document.getElementById('psm-account-holder').value.trim(),
+    documents,
   };
+  if (_staffPhotoData !== null) body.photo_data = _staffPhotoData;
   if (!body.name)     { showToast('請填寫姓名', 'error'); return; }
   if (!body.username) { showToast('請填寫帳號', 'error'); return; }
   const url    = id ? `/api/punch/staff/${id}` : '/api/punch/staff';
@@ -10391,7 +10486,7 @@ function renderDocsMatrix() {
   }
 
   const head = `<tr>
-    <th style="position:sticky;left:0;background:var(--card-bg,#fff);z-index:1;min-width:90px">姓名</th>
+    <th style="position:sticky;left:0;background:#f7f9fd;z-index:2;min-width:96px;box-shadow:1px 0 0 var(--border)">姓名</th>
     <th>部門</th>
     ${types.map(t => `<th style="text-align:center;white-space:nowrap">${escHtml(t.name)}${t.required ? '' : '<span style="font-weight:400;color:var(--muted)"> (選)'+'</span>'}</th>`).join('')}
     <th style="text-align:center">缺件數</th>
@@ -10400,27 +10495,28 @@ function renderDocsMatrix() {
   const body = staff.map(s => {
     const cells = types.map(t => {
       const c = s.items[String(t.id)] || { status:'missing', source:'none' };
-      let mark, color, title = '';
+      let mark, color, bg, title = '';
       if (c.status === 'received') {
         mark = '✓';
         color = c.source === 'auto' ? 'var(--muted)' : 'var(--green)';
+        bg    = c.source === 'auto' ? '#f1f4f9' : 'var(--green-light)';
         title = c.source === 'auto' ? '系統自動判定' : '已收';
         if (c.content) title += '：' + c.content;
       } else if (c.status === 'na') {
-        mark = '免'; color = 'var(--muted)'; title = '免附';
+        mark = '免'; color = 'var(--muted)'; bg = '#f1f4f9'; title = '免附';
       } else {
-        mark = '✗'; color = 'var(--red)'; title = '缺件';
+        mark = '✗'; color = 'var(--red)'; bg = 'var(--red-light)'; title = '缺件';
       }
-      return `<td style="text-align:center">
+      return `<td style="text-align:center;padding:6px">
         <span onclick="openDocCellModal(${s.id},${t.id})" title="${escHtml(title)}"
-              style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;font-weight:700;color:${color};background:${c.status==='missing'?'var(--red-light,#fee2e2)':'var(--gray-100,#f3f4f6)'}">${mark}</span>
+              style="cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;font-weight:700;font-size:14px;color:${color};background:${bg};border:1px solid rgba(0,0,0,.04);transition:transform .1s" onmouseover="this.style.transform='scale(1.12)'" onmouseout="this.style.transform='scale(1)'">${mark}</span>
       </td>`;
     }).join('');
     const mc = s.missing_count > 0
       ? `<span class="badge badge-warn">${s.missing_count}</span>`
       : '<span class="badge badge-ok">齊全</span>';
     return `<tr>
-      <td style="position:sticky;left:0;background:var(--card-bg,#fff);font-weight:600">${escHtml(s.name)}</td>
+      <td style="position:sticky;left:0;background:var(--surface);font-weight:600;box-shadow:1px 0 0 var(--border)">${escHtml(s.name)}</td>
       <td style="font-size:12px;color:var(--muted)">${escHtml(s.department || '—')}</td>
       ${cells}
       <td style="text-align:center">${mc}</td>
@@ -10594,12 +10690,16 @@ function renderPunchStaff() {
     const bankInfo = s.bank_account
       ? `<span style="font-family:'DM Mono',monospace;font-size:11px">${escHtml(s.bank_name||'')} ${escHtml(s.bank_account)}</span>`
       : '<span style="color:var(--muted);font-size:12px">未設定</span>';
+    const pwCell = s.password_plain
+      ? `<span class="pw-mask" id="pw${s.id}" data-shown="0">••••••</span><button class="pw-eye" onclick="togglePw(${s.id})" title="顯示/隱藏密碼">👁</button>`
+      : '<span style="color:var(--muted);font-size:12px">未設定</span>';
     return `<tr draggable="true" data-id="${s.id}" style="cursor:default">
     <td style="cursor:grab;text-align:center;color:var(--muted);font-size:16px;user-select:none" class="drag-handle" title="拖曳排序">⠿</td>
     <td style="font-weight:600">${escHtml(s.name)}</td>
     <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">${escHtml(s.employee_code||'—')}</td>
     <td style="color:var(--muted);font-size:13px">${escHtml(dept)}</td>
     <td style="font-family:'DM Mono',monospace;font-size:12px">${escHtml(s.username||'—')}</td>
+    <td style="white-space:nowrap">${pwCell}</td>
     <td>${bankInfo}</td>
     <td>${s.active ? '<span class="badge badge-ok">在職</span>' : '<span class="badge badge-warn">停用</span>'}</td>
     <td style="white-space:nowrap">
@@ -10909,7 +11009,7 @@ function filterExpenseReview() {
       <td>${esc(c.category)}</td>
       <td style="font-family:'DM Mono',monospace;text-align:right">NT$ ${fmtNum(c.amount)}</td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.note||'—')}</td>
-      <td style="text-align:center">${c.document_id ? `<span style="color:var(--accent);font-size:12px">有附件</span>` : '—'}</td>
+      <td style="text-align:center">${c.document_id ? `<a href="/api/documents/${c.document_id}/image" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none">📎 查看附件</a>` : '—'}</td>
       <td><span style="color:${statusColor[c.status]||'var(--muted)'};font-size:12px;font-weight:600">${statusMap[c.status]||c.status}</span></td>
       <td>
         ${c.status === 'pending' ? `

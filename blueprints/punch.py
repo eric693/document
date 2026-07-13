@@ -32,7 +32,10 @@ def punch_staff_row(row):
     if not row: return None
     d = dict(row)
     d.pop('password_hash', None)
-    d.pop('password_plain', None)
+    # password_plain 保留給後台檢視（清單端會對無權限管理員再行過濾）
+    # 照片以獨立端點提供，避免清單 payload 過大
+    d['has_photo'] = bool(d.get('photo_data'))
+    d.pop('photo_data', None)
     if d.get('created_at'): d['created_at'] = d['created_at'].isoformat()
     if d.get('hire_date'):  d['hire_date']  = d['hire_date'].isoformat()
     if d.get('birth_date'): d['birth_date'] = d['birth_date'].isoformat()
@@ -156,6 +159,11 @@ def api_punch_login():
         with get_db() as conn:
             conn.execute("UPDATE punch_staff SET password_hash=%s WHERE id=%s",
                          (hash_password(password), staff['id']))
+    # 後台可檢視密碼：既有帳號於下次登入時補存明碼
+    if not (staff.get('password_plain') or ''):
+        with get_db() as conn:
+            conn.execute("UPDATE punch_staff SET password_plain=%s WHERE id=%s",
+                         (password, staff['id']))
     session['punch_staff_id']   = staff['id']
     session['punch_staff_name'] = staff['name']
     return jsonify({'id': staff['id'], 'name': staff['name'], 'role': staff['role']})
@@ -413,14 +421,27 @@ def api_punch_my_records():
 def api_punch_staff_list():
     with get_db() as conn:
         rows = conn.execute("SELECT * FROM punch_staff ORDER BY sort_order, name").fetchall()
+        # 文件收件狀態（手動登記項目，供員工表單勾選預填）
+        doc_types = conn.execute(
+            "SELECT id, name FROM document_types WHERE active=TRUE AND (staff_field='' OR staff_field IS NULL) ORDER BY sort_order, id"
+        ).fetchall()
+        doc_recs = conn.execute(
+            "SELECT sd.staff_id, dt.name, sd.status FROM staff_documents sd "
+            "JOIN document_types dt ON dt.id=sd.doc_type_id"
+        ).fetchall()
+    doc_by_staff = {}
+    for r in doc_recs:
+        doc_by_staff.setdefault(r['staff_id'], {})[r['name']] = r['status']
     result = [punch_staff_row(r) for r in rows]
+    for d in result:
+        d['doc_status'] = doc_by_staff.get(d['id'], {})
     # 員工下拉選單全後台共用，但薪資/銀行/生日等敏感欄位只給有 punch 或 salary 模組權限的管理員
     perms = session.get('admin_permissions') or []
     if not (session.get('admin_is_super') or 'punch' in perms or 'salary' in perms):
         SENSITIVE = ('base_salary', 'insured_salary', 'hourly_rate', 'daily_hours',
                      'salary_type', 'ot_rate1', 'ot_rate2', 'ot_rate3', 'vacation_quota',
                      'bank_code', 'bank_name', 'bank_branch', 'bank_account',
-                     'account_holder', 'birth_date', 'termination_reason')
+                     'account_holder', 'birth_date', 'termination_reason', 'password_plain')
         for d in result:
             for k in SENSITIVE:
                 d.pop(k, None)
@@ -440,6 +461,60 @@ def api_punch_staff_reorder():
                 (int(item.get('sort_order', 0)), int(item['id']))
             )
     return jsonify({'ok': True})
+
+
+@bp.route('/api/punch/doc-items', methods=['GET'])
+@require_module('punch')
+def api_punch_doc_items():
+    """員工表單的文件收件勾選項（文件管理中未綁定自動欄位的項目）"""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, name, required FROM document_types "
+            "WHERE active=TRUE AND (staff_field='' OR staff_field IS NULL) "
+            "ORDER BY sort_order, id"
+        ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+# 照片 data URI 上限（base64 後約 2.7MB ≒ 原圖 2MB）
+_PHOTO_MAX_LEN = 2_800_000
+
+
+def _clean_photo(b):
+    """驗證並回傳 photo_data（None=不更新、''=清除、data URI=更新）"""
+    p = b.get('photo_data')
+    if p is None:
+        return None
+    p = str(p).strip()
+    if p == '':
+        return ''
+    if not p.startswith('data:image/') or len(p) > _PHOTO_MAX_LEN:
+        return None   # 非法內容不寫入
+    return p
+
+
+def _apply_staff_documents(conn, sid, documents):
+    """員工表單的收件勾選 → staff_documents（勾＝已收、未勾＝刪除手動記錄）"""
+    if not isinstance(documents, dict):
+        return
+    who = session.get('admin_display_name', '管理員')
+    for name, checked in documents.items():
+        t = conn.execute(
+            "SELECT id FROM document_types WHERE name=%s AND active=TRUE", (str(name),)
+        ).fetchone()
+        if not t:
+            continue
+        if checked:
+            conn.execute("""
+                INSERT INTO staff_documents (staff_id, doc_type_id, status, received_date, updated_by)
+                VALUES (%s,%s,'received',CURRENT_DATE,%s)
+                ON CONFLICT (staff_id, doc_type_id) DO UPDATE SET
+                  status='received', updated_by=EXCLUDED.updated_by, updated_at=NOW()
+            """, (sid, t['id'], who))
+        else:
+            conn.execute(
+                "DELETE FROM staff_documents WHERE staff_id=%s AND doc_type_id=%s",
+                (sid, t['id']))
 
 
 @bp.route('/api/punch/staff', methods=['POST'])
@@ -463,17 +538,26 @@ def api_punch_staff_create():
     bank_branch    = (b.get('bank_branch') or '').strip()
     bank_account   = (b.get('bank_account') or '').strip()
     account_holder = (b.get('account_holder') or '').strip()
+    company           = (b.get('company') or '').strip()
+    national_id       = (b.get('national_id') or '').strip()
+    phone             = (b.get('phone') or '').strip()
+    emergency_contact = (b.get('emergency_contact') or '').strip()
+    address           = (b.get('address') or '').strip()
+    photo             = _clean_photo(b) or ''
     try:
         with get_db() as conn:
             row = conn.execute("""
                 INSERT INTO punch_staff
-                  (name, username, password_hash, role, position_title, employee_code,
+                  (name, username, password_hash, password_plain, role, position_title, employee_code,
                    department, hire_date, birth_date,
-                   bank_code, bank_name, bank_branch, bank_account, account_holder)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *
-            """, (name, username, hash_password(password), role, role, employee_code,
+                   bank_code, bank_name, bank_branch, bank_account, account_holder,
+                   company, national_id, phone, emergency_contact, address, photo_data)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *
+            """, (name, username, hash_password(password), password, role, role, employee_code,
                   department, hire_date, birth_date,
-                  bank_code, bank_name, bank_branch, bank_account, account_holder)).fetchone()
+                  bank_code, bank_name, bank_branch, bank_account, account_holder,
+                  company, national_id, phone, emergency_contact, address, photo)).fetchone()
+            _apply_staff_documents(conn, row['id'], b.get('documents'))
         return jsonify(punch_staff_row(row)), 201
     except psycopg.errors.UniqueViolation:
         return jsonify({'error': '姓名或帳號已存在，請換一個'}), 409
@@ -501,32 +585,67 @@ def api_punch_staff_update(sid):
     department     = (b.get('department') or '').strip()
     hire_date      = b.get('hire_date') or None
     birth_date     = b.get('birth_date') or None
+    company           = (b.get('company') or '').strip()
+    national_id       = (b.get('national_id') or '').strip()
+    phone             = (b.get('phone') or '').strip()
+    emergency_contact = (b.get('emergency_contact') or '').strip()
+    address           = (b.get('address') or '').strip()
+    photo             = _clean_photo(b)   # None=不更新
     if not name or not username:
         return jsonify({'error': '姓名和帳號為必填'}), 400
     if password and len(password) < 8:
         return jsonify({'error': '密碼至少 8 個字元'}), 400
     with get_db() as conn:
+        extra_sql, extra_vals = '', []
+        if photo is not None:
+            extra_sql = ',photo_data=%s'
+            extra_vals = [photo]
         if password:
-            row = conn.execute("""
+            row = conn.execute(f"""
                 UPDATE punch_staff
-                SET name=%s,username=%s,password_hash=%s,role=%s,position_title=%s,active=%s,employee_code=%s,
+                SET name=%s,username=%s,password_hash=%s,password_plain=%s,role=%s,position_title=%s,active=%s,employee_code=%s,
                     department=%s,hire_date=%s,birth_date=%s,
-                    bank_code=%s,bank_name=%s,bank_branch=%s,bank_account=%s,account_holder=%s
+                    bank_code=%s,bank_name=%s,bank_branch=%s,bank_account=%s,account_holder=%s,
+                    company=%s,national_id=%s,phone=%s,emergency_contact=%s,address=%s{extra_sql}
                 WHERE id=%s RETURNING *
-            """, (name, username, hash_password(password), role, role, active, employee_code,
+            """, [name, username, hash_password(password), password, role, role, active, employee_code,
                   department, hire_date, birth_date,
-                  bank_code, bank_name, bank_branch, bank_account, account_holder, sid)).fetchone()
+                  bank_code, bank_name, bank_branch, bank_account, account_holder,
+                  company, national_id, phone, emergency_contact, address] + extra_vals + [sid]).fetchone()
         else:
-            row = conn.execute("""
+            row = conn.execute(f"""
                 UPDATE punch_staff
                 SET name=%s,username=%s,role=%s,position_title=%s,active=%s,employee_code=%s,
                     department=%s,hire_date=%s,birth_date=%s,
-                    bank_code=%s,bank_name=%s,bank_branch=%s,bank_account=%s,account_holder=%s
+                    bank_code=%s,bank_name=%s,bank_branch=%s,bank_account=%s,account_holder=%s,
+                    company=%s,national_id=%s,phone=%s,emergency_contact=%s,address=%s{extra_sql}
                 WHERE id=%s RETURNING *
-            """, (name, username, role, role, active, employee_code,
+            """, [name, username, role, role, active, employee_code,
                   department, hire_date, birth_date,
-                  bank_code, bank_name, bank_branch, bank_account, account_holder, sid)).fetchone()
+                  bank_code, bank_name, bank_branch, bank_account, account_holder,
+                  company, national_id, phone, emergency_contact, address] + extra_vals + [sid]).fetchone()
+        if row:
+            _apply_staff_documents(conn, sid, b.get('documents'))
     return jsonify(punch_staff_row(row)) if row else ('', 404)
+
+
+@bp.route('/api/punch/staff/<int:sid>/photo', methods=['GET'])
+@require_module('punch')
+def api_punch_staff_photo(sid):
+    with get_db() as conn:
+        row = conn.execute("SELECT photo_data FROM punch_staff WHERE id=%s", (sid,)).fetchone()
+    data = (row or {}).get('photo_data') or ''
+    if not data.startswith('data:image/'):
+        return jsonify({'error': '無照片'}), 404
+    import base64 as _b64p
+    header, b64 = data.split(',', 1)
+    mime = header.split(':', 1)[1].split(';', 1)[0]
+    try:
+        raw = _b64p.b64decode(b64)
+    except Exception:
+        return jsonify({'error': '照片資料損毀'}), 500
+    from flask import Response as _Resp
+    return _Resp(raw, mimetype=mime)
 
 
 @bp.route('/api/punch/staff/<int:sid>', methods=['DELETE'])

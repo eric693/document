@@ -219,6 +219,7 @@ def init_db():
     # --- Schema migrations (各用獨立連線，避免 transaction abort 汙染) ---
     migrations = [
         # punch_staff
+        "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS password_plain TEXT DEFAULT ''",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS department TEXT DEFAULT ''",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS position_title TEXT DEFAULT ''",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS employee_code TEXT DEFAULT ''",
@@ -252,6 +253,11 @@ def init_db():
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS gender TEXT DEFAULT ''",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS insurance_type TEXT DEFAULT 'regular'",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS address TEXT DEFAULT ''",
+        # 員工資料 16 項（新增員工表單）
+        "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS photo_data TEXT DEFAULT ''",
+        "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS company TEXT DEFAULT ''",
+        "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS phone TEXT DEFAULT ''",
+        "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS emergency_contact TEXT DEFAULT ''",
         "ALTER TABLE shift_types ADD COLUMN IF NOT EXISTS departments TEXT DEFAULT ''",
         # punch_config — 固定上下班時間（無排班公司用，批次補登等功能的依據）
         "ALTER TABLE punch_config ADD COLUMN IF NOT EXISTS work_start_time TEXT DEFAULT '08:00'",
@@ -296,9 +302,8 @@ def init_db():
         "ALTER TABLE schedule_requests ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ",
         # admin_accounts
         "ALTER TABLE admin_accounts ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ",
-        # 明文密碼欄位一律移除（安全性）
+        # 管理員帳號明文密碼移除（安全性）；員工帳號明文保留供後台檢視（依需求）
         "ALTER TABLE admin_accounts DROP COLUMN IF EXISTS password_plain",
-        "ALTER TABLE punch_staff DROP COLUMN IF EXISTS password_plain",
         # leave_requests
         "ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS leave_start_time TEXT",
         "ALTER TABLE leave_requests ADD COLUMN IF NOT EXISTS leave_end_time TEXT",
