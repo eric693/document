@@ -210,7 +210,7 @@ def api_export_training():
 
     from openpyxl.styles import PatternFill, Alignment, Border, Side
     wb, ws = _xl_workbook('訓練記錄')
-    headers = ['員工姓名','部門','課程名稱','類別','完訓日期','到期日','證書號碼','剩餘天數','狀態','備註']
+    headers = ['員工姓名','案場','課程名稱','類別','完訓日期','到期日','證書號碼','剩餘天數','狀態','備註']
     widths  = [10, 12, 24, 10, 12, 12, 16, 9, 10, 20]
     _xl_write_header(ws, headers, widths)
 

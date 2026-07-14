@@ -313,6 +313,12 @@ def staff_import():
                     d = _parse_date(raw)
                     if d:
                         fields[field] = d
+                elif field == 'criminal_record':
+                    # 僅接受 有/無，其他值略過並提示
+                    if raw in ('有', '無'):
+                        fields[field] = raw
+                    elif raw != '':
+                        errors.append(f'第 {rownum} 列：前科「{raw}」無效（僅接受 有/無），該欄已略過')
                 else:
                     if raw != '':
                         fields[field] = raw
@@ -408,7 +414,7 @@ def staff_import():
 #  文件管理狀態矩陣
 # ═════════════════════════════════════════════════════════════════════════════
 
-_DOC_ID_HEADERS = ['員工編號', '姓名', '部門']
+_DOC_ID_HEADERS = ['員工編號', '姓名', '案場']
 
 
 def _doc_matrix_wb(include_status):

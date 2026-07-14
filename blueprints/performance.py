@@ -414,7 +414,7 @@ def api_export_performance():
         """, params).fetchall()
 
     wb, ws = _xl_workbook('績效考核')
-    headers = ['員工代碼','姓名','部門','職稱','考核期間','考核表','分數','滿分','百分比','等級','考核人','備註','考核日期']
+    headers = ['員工代碼','姓名','案場','職稱','考核期間','考核表','分數','滿分','百分比','等級','考核人','備註','考核日期']
     widths  = [10, 10, 12, 12, 16, 16, 8, 8, 9, 6, 10, 30, 16]
     _xl_write_header(ws, headers, widths)
     _xl_write_rows(ws, [
@@ -450,7 +450,7 @@ def api_export_performance_pdf():
             LEFT JOIN performance_templates pt ON pt.id = pr.template_id
             WHERE {' AND '.join(conds)} ORDER BY pr.reviewed_at DESC
         """, params).fetchall()
-    headers    = ['代碼', '姓名', '部門', '考核期間', '分數', '滿分', '%', '等級', '考核人', '考核日期']
+    headers    = ['代碼', '姓名', '案場', '考核期間', '分數', '滿分', '%', '等級', '考核人', '考核日期']
     col_widths = [45, 55, 60, 70, 40, 40, 40, 40, 55, 75]
     data = [[r['employee_code'] or '', r['staff_name'], r['department'] or '',
              r['period_label'] or '',
