@@ -313,6 +313,9 @@ def staff_import():
                     d = _parse_date(raw)
                     if d:
                         fields[field] = d
+                elif field == 'staff_note':
+                    if raw != '':
+                        fields[field] = raw[:2000]
                 elif field == 'criminal_record':
                     # 僅接受 有/無，其他值略過並提示
                     if raw in ('有', '無'):

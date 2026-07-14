@@ -2424,7 +2424,8 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <!-- 備註 -->
       <div class="fm-section">
         <div class="fm-sec-head"><span class="dot"></span><span class="t">備註</span><span class="line"></span></div>
-        <textarea class="form-input" id="psm-note" rows="3" placeholder="員工相關備註（選填，僅管理端可見）" style="width:100%;resize:vertical;font-family:'Noto Sans TC',sans-serif"></textarea>
+        <textarea class="form-input" id="psm-note" rows="3" maxlength="2000" placeholder="員工相關備註（選填，僅管理端可見，上限 2000 字）" style="width:100%;resize:vertical;font-family:'Noto Sans TC',sans-serif" oninput="document.getElementById('psm-note-count').textContent=this.value.length+' / 2000'"></textarea>
+        <div class="fm-note" id="psm-note-count" style="text-align:right">0 / 2000</div>
       </div>
 
       <!-- 自訂欄位 -->
@@ -4655,6 +4656,7 @@ function openPunchStaffModal(id=null) {
     document.getElementById('psm-address').value        = s.address || '';
     document.getElementById('psm-criminal').value       = s.criminal_record || '';
     document.getElementById('psm-note').value           = s.staff_note || '';
+    document.getElementById('psm-note-count').textContent = (s.staff_note || '').length + ' / 2000';
     document.getElementById('psm-username').value       = s.username || '';
     document.getElementById('psm-active').value         = s.active ? '1' : '0';
     document.getElementById('psm-password').value       = s.password_plain || '';
@@ -4671,6 +4673,7 @@ function openPunchStaffModal(id=null) {
     document.getElementById('psm-active').value = '1';
     document.getElementById('psm-criminal').value = '';
     document.getElementById('psm-note').value = '';
+    document.getElementById('psm-note-count').textContent = '0 / 2000';
     document.getElementById('psm-pw-hint').textContent = '新增員工請設定密碼（至少 8 碼），可點「產生」';
   }
   // 照片預覽
