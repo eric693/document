@@ -114,12 +114,14 @@ STAFF_COLUMNS = [
     ('姓名',       'name',           'text'),
     ('帳號',       'username',       'text'),
     ('密碼',       'password',       'password'),
-    ('部門',       'department',     'text'),
+    ('案場',       'department',     'text'),
     ('職稱',       'position_title', 'text'),
     ('公司',       'company',        'text'),
     ('身分證字號', 'national_id',    'text'),
     ('電話',       'phone',          'text'),
     ('緊急聯絡人', 'emergency_contact', 'text'),
+    ('前科',       'criminal_record', 'text'),
+    ('備註',       'staff_note',     'text'),
     ('性別',       'gender',         'text'),
     ('生日',       'birth_date',     'date'),
     ('到職日',     'hire_date',      'date'),
@@ -154,7 +156,7 @@ def _staff_wb(rows_data, extra_headers=None):
     for r in rows_data:
         ws.append(r)
     _style_header(ws, len(headers))
-    widths = [12, 12, 14, 12, 12, 12, 12, 16, 13, 12, 6, 12, 12, 24, 10, 12, 12, 16, 12, 8]
+    widths = [12, 12, 14, 12, 12, 12, 12, 16, 13, 12, 6, 20, 6, 12, 12, 24, 10, 12, 12, 16, 12, 8]
     widths += [14] * len(extra_headers or [])
     for i, w in enumerate(widths, 1):
         ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
@@ -182,8 +184,8 @@ def staff_template():
     with get_db() as conn:
         defs = _active_field_defs(conn)
     example = [
-        'A001', '王小明', 'wang.ming', '', '門市部', '店員', '永興公司',
-        'A123456789', '0912345678', '王大明 0987654321',
+        'A001', '王小明', 'wang.ming', '', '一號案場', '店員', '永興公司',
+        'A123456789', '0912345678', '王大明 0987654321', '無', '',
         '男', '1990-05-20', '2024-01-05', '台北市信義區…',
         '822', '中國信託', '信義分行', '1234567890123', '王小明', '在職',
     ] + [''] * len(defs)
@@ -205,7 +207,7 @@ def staff_export():
         # 只取匯出需要的欄位（排除照片等大欄位）
         staff = conn.execute(
             "SELECT employee_code, name, username, department, position_title, company, "
-            "national_id, phone, emergency_contact, gender, birth_date, hire_date, address, "
+            "national_id, phone, emergency_contact, criminal_record, staff_note, gender, birth_date, hire_date, address, "
             "bank_code, bank_name, bank_branch, bank_account, account_holder, active, custom_fields "
             f"FROM punch_staff WHERE {' AND '.join(conds)} "
             "ORDER BY department, sort_order, id", params
@@ -243,6 +245,7 @@ def staff_import():
     header = rows[0]
     # 建立「欄位 index」對照（依表頭中文比對，容許順序不同、缺欄位）
     zh_to_field = {zh: (field, typ) for zh, field, typ in STAFF_COLUMNS}
+    zh_to_field['部門'] = ('department', 'text')   # 相容舊版表頭
     col_idx = {}   # field -> column index
     col_type = {}
     for i, h in enumerate(header):

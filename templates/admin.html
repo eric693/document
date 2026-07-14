@@ -531,13 +531,13 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="punch-panel-staff" style="display:none">
       <div class="filter-bar" style="margin-bottom:12px;gap:10px;flex-wrap:wrap">
         <input class="filter-input" id="ps-search" placeholder="搜尋姓名 / 代碼" style="min-width:160px" oninput="renderPunchStaff()">
-        <select class="filter-input" id="ps-dept" onchange="renderPunchStaff()" style="min-width:110px"><option value="">全部部門</option></select>
+        <select class="filter-input" id="ps-dept" onchange="renderPunchStaff()" style="min-width:110px"><option value="">全部案場</option></select>
         <select class="filter-input" id="ps-status" onchange="renderPunchStaff()" style="min-width:100px">
           <option value="">全部狀態</option><option value="1">在職</option><option value="0">停用</option>
         </select>
         <span style="flex:1"></span>
         <span id="punch-staff-count" style="font-size:13px;color:var(--muted)"></span>
-        <button class="btn btn-ghost btn-sm" onclick="openStaffSettings()" title="管理部門與自訂欄位">⚙ 欄位設定</button>
+        <button class="btn btn-ghost btn-sm" onclick="openStaffSettings()" title="管理案場與自訂欄位">⚙ 欄位設定</button>
         <button class="btn btn-outline btn-sm" onclick="window.open('/api/bulk/staff/template','_blank')" title="下載匯入範本">範本</button>
         <button class="btn btn-outline btn-sm" onclick="exportStaffExcel()" title="匯出目前員工名單">匯出</button>
         <button class="btn btn-outline btn-sm" onclick="document.getElementById('staff-import-file').click()" title="上傳 Excel 批次匯入">匯入</button>
@@ -547,7 +547,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <div class="card">
         <div class="table-wrap">
           <table>
-            <thead><tr><th style="width:32px"></th><th style="width:44px">照片</th><th>姓名</th><th>員工編號</th><th>部門/職稱</th><th>帳號</th><th>密碼</th><th>匯款帳號</th><th>狀態</th><th>操作</th></tr></thead>
+            <thead><tr><th style="width:32px"></th><th style="width:44px">照片</th><th>姓名</th><th>員工編號</th><th>案場/職稱</th><th>帳號</th><th>密碼</th><th>匯款帳號</th><th>狀態</th><th>操作</th></tr></thead>
             <tbody id="punch-staff-tbody"><tr><td colspan="10" class="empty-state"><div class="empty-state-text">載入中...</div></td></tr></tbody>
           </table>
         </div>
@@ -627,7 +627,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="punch-panel-resigned" style="display:none">
       <div class="filter-bar" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
         <input class="filter-input" id="rs-search" placeholder="搜尋姓名 / 代碼" style="min-width:160px" oninput="renderResignedStaff()">
-        <select class="filter-input" id="rs-dept" onchange="renderResignedStaff()" style="min-width:110px"><option value="">全部部門</option></select>
+        <select class="filter-input" id="rs-dept" onchange="renderResignedStaff()" style="min-width:110px"><option value="">全部案場</option></select>
         <span style="flex:1"></span>
         <button class="btn btn-outline btn-sm" onclick="loadResignedStaff()">重新整理</button>
       </div>
@@ -635,7 +635,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th>姓名</th><th>員工代碼</th><th>部門</th><th>職稱</th>
+              <th>姓名</th><th>員工代碼</th><th>案場</th><th>職稱</th>
               <th>到職日</th><th>離職日</th><th>原因</th><th>操作</th>
             </tr></thead>
             <tbody id="resigned-tbody">
@@ -746,7 +746,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <div class="card">
         <div class="table-wrap">
           <table>
-            <thead><tr><th style="width:36px;text-align:center"><input type="checkbox" id="anomaly-checkall" onclick="toggleAllAnomalies(this.checked)" title="全選可補登"></th><th>嚴重程度</th><th>員工</th><th>部門</th><th>日期</th><th>異常類型</th><th>說明</th></tr></thead>
+            <thead><tr><th style="width:36px;text-align:center"><input type="checkbox" id="anomaly-checkall" onclick="toggleAllAnomalies(this.checked)" title="全選可補登"></th><th>嚴重程度</th><th>員工</th><th>案場</th><th>日期</th><th>異常類型</th><th>說明</th></tr></thead>
             <tbody id="anomaly-tbody"><tr><td colspan="7" class="empty-state"><div class="empty-state-text">請稍候...</div></td></tr></tbody>
           </table>
         </div>
@@ -767,7 +767,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
           <table>
             <thead>
               <tr>
-                <th>姓名</th><th>部門</th>
+                <th>姓名</th><th>案場</th>
                 <th style="text-align:center">出勤天數</th>
                 <th style="text-align:center">總工時</th>
                 <th style="text-align:center">平均時數/天</th>
@@ -815,7 +815,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <!-- 班別設定 -->
     <div id="sched-panel-shifttypes" style="display:none">
       <div class="filter-bar" style="margin-bottom:12px;gap:10px;flex-wrap:wrap">
-        <input class="filter-input" id="st-search" placeholder="搜尋班別名稱 / 部門" style="min-width:180px" oninput="renderShiftTypes()">
+        <input class="filter-input" id="st-search" placeholder="搜尋班別名稱 / 案場" style="min-width:180px" oninput="renderShiftTypes()">
         <select class="filter-input" id="st-status" onchange="renderShiftTypes()" style="min-width:100px">
           <option value="">全部狀態</option><option value="1">啟用</option><option value="0">停用</option>
         </select>
@@ -825,7 +825,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <div class="card">
         <div class="table-wrap">
           <table>
-            <thead><tr><th>班別名稱</th><th>上班時間</th><th>下班時間</th><th>適用部門</th><th>顏色</th><th>狀態</th><th>操作</th></tr></thead>
+            <thead><tr><th>班別名稱</th><th>上班時間</th><th>下班時間</th><th>適用案場</th><th>顏色</th><th>狀態</th><th>操作</th></tr></thead>
             <tbody id="shift-types-tbody"><tr><td colspan="7" class="empty-state"><div class="empty-state-text">載入中...</div></td></tr></tbody>
           </table>
         </div>
@@ -1051,7 +1051,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         <span class="filter-label">月份</span>
         <input class="filter-input" type="month" id="sal-month" onchange="loadSalaryRecords()">
         <div class="filter-divider"></div>
-        <select class="filter-input" id="sal-filter-dept" onchange="renderSalaryTable()" style="min-width:110px"><option value="">全部部門</option></select>
+        <select class="filter-input" id="sal-filter-dept" onchange="renderSalaryTable()" style="min-width:110px"><option value="">全部案場</option></select>
         <select class="filter-input" id="sal-filter-emp" onchange="renderSalaryTable()" style="min-width:110px">
           <option value="active">在職</option><option value="">在職＋離職</option><option value="terminated">僅離職</option>
         </select>
@@ -1074,7 +1074,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <div class="card">
         <div class="table-wrap">
           <table>
-            <thead><tr><th>代碼</th><th>姓名</th><th>部門</th><th>出勤</th><th>津貼合計</th><th>扣除合計</th><th>實領金額</th><th>狀態</th><th>操作</th></tr></thead>
+            <thead><tr><th>代碼</th><th>姓名</th><th>案場</th><th>出勤</th><th>津貼合計</th><th>扣除合計</th><th>實領金額</th><th>狀態</th><th>操作</th></tr></thead>
             <tbody id="sal-tbody"></tbody>
           </table>
         </div>
@@ -1148,7 +1148,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
 
       <div class="filter-bar" style="margin-bottom:12px;gap:10px;flex-wrap:wrap">
         <input class="filter-input" id="ss-search" placeholder="搜尋姓名" style="min-width:160px" oninput="renderSalaryStaff()">
-        <select class="filter-input" id="ss-dept" onchange="renderSalaryStaff()" style="min-width:110px"><option value="">全部部門</option></select>
+        <select class="filter-input" id="ss-dept" onchange="renderSalaryStaff()" style="min-width:110px"><option value="">全部案場</option></select>
         <select class="filter-input" id="ss-status" onchange="renderSalaryStaff()" style="min-width:100px">
           <option value="">全部狀態</option><option value="1">在職</option><option value="0">停用</option>
         </select>
@@ -1159,7 +1159,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <div class="card">
         <div class="table-wrap">
           <table>
-            <thead><tr><th>姓名</th><th>帳號</th><th>部門</th><th>職稱</th><th>到職日</th><th>底薪</th><th>投保薪資</th><th>排休配額</th><th>狀態</th><th>操作</th></tr></thead>
+            <thead><tr><th>姓名</th><th>帳號</th><th>案場</th><th>職稱</th><th>到職日</th><th>底薪</th><th>投保薪資</th><th>排休配額</th><th>狀態</th><th>操作</th></tr></thead>
             <tbody id="sal-staff-tbody"></tbody>
           </table>
         </div>
@@ -1806,7 +1806,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="training-panel-overview">
       <div class="filter-bar" style="margin-bottom:16px;gap:10px;flex-wrap:wrap">
         <input class="filter-input" id="trn-search" placeholder="搜尋姓名" style="min-width:140px" oninput="renderTrainingSummary()">
-        <select class="filter-input" id="trn-dept" onchange="renderTrainingSummary()" style="min-width:110px"><option value="">全部部門</option></select>
+        <select class="filter-input" id="trn-dept" onchange="renderTrainingSummary()" style="min-width:110px"><option value="">全部案場</option></select>
         <span style="flex:1"></span>
         <button class="btn btn-primary btn-sm" onclick="openTrainingModal()">新增訓練記錄</button>
         <button class="btn btn-outline btn-sm" onclick="loadTrainingSummary()">重新整理</button>
@@ -1815,7 +1815,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         <div class="table-wrap">
           <table class="data-table">
             <thead><tr>
-              <th>姓名</th><th>部門</th><th>訓練筆數</th>
+              <th>姓名</th><th>案場</th><th>訓練筆數</th>
               <th style="color:var(--green)">有效</th>
               <th style="color:var(--amber,#d97706)">即將到期</th>
               <th style="color:var(--red)">已過期</th>
@@ -1895,7 +1895,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="docs-panel-matrix">
       <div class="filter-bar" style="margin-bottom:16px;gap:10px;flex-wrap:wrap">
         <input class="filter-input" id="docs-search" placeholder="搜尋姓名" style="min-width:140px" oninput="renderDocsMatrix()">
-        <select class="filter-input" id="docs-dept" onchange="renderDocsMatrix()" style="min-width:110px"><option value="">全部部門</option></select>
+        <select class="filter-input" id="docs-dept" onchange="renderDocsMatrix()" style="min-width:110px"><option value="">全部案場</option></select>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
           <input type="checkbox" id="docs-only-missing" onchange="renderDocsMatrix()"> 只顯示有缺件
         </label>
@@ -2385,9 +2385,10 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
           <div class="form-group"><label class="form-label">姓名 *</label><input class="form-input" id="psm-name" placeholder="員工姓名" style="font-family:'Noto Sans TC',sans-serif" oninput="if(!document.getElementById('psm-account-holder').value)document.getElementById('psm-account-holder').value=this.value"></div>
           <div class="form-group"><label class="form-label">員工編號</label><input class="form-input" id="psm-code" placeholder="例：EMP001"></div>
           <div class="form-group"><label class="form-label">公司</label><input class="form-input" id="psm-company" placeholder="例：永興公司" style="font-family:'Noto Sans TC',sans-serif"></div>
-          <div class="form-group"><label class="form-label">部門</label><input class="form-input" id="psm-department" placeholder="例：門市部" list="dept-datalist" style="font-family:'Noto Sans TC',sans-serif"><datalist id="dept-datalist"></datalist><div class="fm-note">可選既有部門或直接輸入新部門，篩選器會自動更新</div></div>
+          <div class="form-group"><label class="form-label">案場</label><input class="form-input" id="psm-department" placeholder="例：門市部" list="dept-datalist" style="font-family:'Noto Sans TC',sans-serif"><datalist id="dept-datalist"></datalist><div class="fm-note">可選既有案場或直接輸入新案場，篩選器會自動更新</div></div>
           <div class="form-group"><label class="form-label">職稱</label><input class="form-input" id="psm-role" placeholder="例：店員" style="font-family:'Noto Sans TC',sans-serif"></div>
           <div class="form-group"><label class="form-label">在職狀態</label><select class="form-input" id="psm-active"><option value="1">在職</option><option value="0">停用</option></select></div>
+          <div class="form-group"><label class="form-label">前科</label><select class="form-input" id="psm-criminal"><option value="">未填</option><option value="無">無</option><option value="有">有</option></select></div>
           <div class="form-group"><label class="form-label">到職日</label><input class="form-input" type="date" id="psm-hire-date"></div>
           <div class="form-group"><label class="form-label">生日</label><input class="form-input" type="date" id="psm-birth-date"></div>
         </div>
@@ -2418,6 +2419,12 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- 備註 -->
+      <div class="fm-section">
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">備註</span><span class="line"></span></div>
+        <textarea class="form-input" id="psm-note" rows="3" placeholder="員工相關備註（選填，僅管理端可見）" style="width:100%;resize:vertical;font-family:'Noto Sans TC',sans-serif"></textarea>
       </div>
 
       <!-- 自訂欄位 -->
@@ -2465,18 +2472,18 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
   </div>
 </div>
 
-<!-- 員工欄位與部門設定 Modal -->
+<!-- 員工欄位與案場設定 Modal -->
 <div class="modal-overlay" id="staff-settings-modal" style="display:none">
   <div class="modal" style="max-width:640px">
-    <div class="modal-header"><span class="modal-title">員工欄位與部門設定</span><button class="modal-close" onclick="closeStaffSettings()">&times;</button></div>
+    <div class="modal-header"><span class="modal-title">員工欄位與案場設定</span><button class="modal-close" onclick="closeStaffSettings()">&times;</button></div>
     <div class="modal-body">
       <div class="fm-section">
-        <div class="fm-sec-head"><span class="dot"></span><span class="t">部門管理</span><span class="line"></span></div>
-        <div class="fm-note" style="margin:0 0 10px">改名會同步更新所有員工的部門；仍有在職員工的部門無法刪除</div>
+        <div class="fm-sec-head"><span class="dot"></span><span class="t">案場管理</span><span class="line"></span></div>
+        <div class="fm-note" style="margin:0 0 10px">改名會同步更新所有員工的案場；仍有在職員工的案場無法刪除</div>
         <div id="ss-dept-list" style="display:flex;flex-direction:column;gap:8px"></div>
         <div style="display:flex;gap:8px;margin-top:12px">
-          <input class="form-input" id="ss-dept-new" placeholder="新部門名稱" style="flex:1;font-family:'Noto Sans TC',sans-serif" onkeydown="if(event.key==='Enter')addDepartment()">
-          <button class="btn btn-outline" onclick="addDepartment()">新增部門</button>
+          <input class="form-input" id="ss-dept-new" placeholder="新案場名稱" style="flex:1;font-family:'Noto Sans TC',sans-serif" onkeydown="if(event.key==='Enter')addDepartment()">
+          <button class="btn btn-outline" onclick="addDepartment()">新增案場</button>
         </div>
       </div>
       <div class="fm-section">
@@ -2592,7 +2599,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         <div><label class="form-label">下班時間</label><input class="form-input" type="time" id="stm-end" value="17:00"></div>
       </div>
       <div class="form-row">
-        <div><label class="form-label">適用部門（選填）</label><input class="form-input" id="stm-dept" placeholder="例：外場、廚房"></div>
+        <div><label class="form-label">適用案場（選填）</label><input class="form-input" id="stm-dept" placeholder="例：外場、廚房"></div>
         <div><label class="form-label">排序</label><input class="form-input" type="number" id="stm-sort" value="0" min="0"></div>
       </div>
       <div><label class="form-label">狀態</label><select class="form-input" id="stm-active" style="width:auto"><option value="1">啟用</option><option value="0">停用</option></select></div>
@@ -2885,7 +2892,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <input type="hidden" id="ssm-id">
       <div class="form-grid">
         <div class="form-group"><label class="form-label">員工代碼</label><input class="form-input" id="ssm-code" placeholder="例：EMP001"></div>
-        <div class="form-group"><label class="form-label">部門</label><input class="form-input" id="ssm-dept" placeholder="例：外場"></div>
+        <div class="form-group"><label class="form-label">案場</label><input class="form-input" id="ssm-dept" placeholder="例：外場"></div>
         <div class="form-group"><label class="form-label">職稱</label><input class="form-input" id="ssm-pos" placeholder="例：領班"></div>
         <div class="form-group"><label class="form-label">到職日</label><input class="form-input" type="date" id="ssm-hire"></div>
         <div class="form-group"><label class="form-label">薪資制度</label><select class="form-input" id="ssm-sal-type" onchange="toggleSalType()"><option value="monthly">月薪制</option><option value="hourly">時薪制</option></select></div>
@@ -4400,7 +4407,7 @@ async function loadMonthlyStats() {
 function exportMonthlyStats() {
   const month = document.getElementById('mstats-month').value;
   if (!_mstatsData.length) { showToast('請先查詢月統計資料', true); return; }
-  const rows = [['姓名','部門','出勤天數','總工時','平均時數/天','遲到次數','早退次數','缺打卡次數','異常明細']];
+  const rows = [['姓名','案場','出勤天數','總工時','平均時數/天','遲到次數','早退次數','缺打卡次數','異常明細']];
   _mstatsData.forEach(r => {
     const anomalyText = (r.anomaly_dates || []).map(a => `${a.date} ${a.label}`).join('; ');
     rows.push([
@@ -4563,7 +4570,7 @@ async function loadPunchStaff() {
   const { ok, data } = await api('/api/punch/staff', {}, true);
   punchStaffList = ok ? data : [];
   populateDeptSelect('ps-dept', punchStaffList);
-  // 載入部門清單與自訂欄位定義
+  // 載入案場清單與自訂欄位定義
   const [rDept, rDefs] = await Promise.all([
     api('/api/punch/departments', {}, true),
     api('/api/punch/field-defs', {}, true),
@@ -4579,7 +4586,7 @@ async function loadPunchStaff() {
   }
 }
 function refreshDeptDatalist() {
-  // 員工表單的部門建議清單 = 部門管理清單 ∪ 員工現有部門
+  // 員工表單的案場建議清單 = 案場管理清單 ∪ 員工現有案場
   const dl = document.getElementById('dept-datalist');
   if (!dl) return;
   const names = new Set(punchDeptList.filter(d => d.active).map(d => d.name));
@@ -4588,7 +4595,7 @@ function refreshDeptDatalist() {
 }
 let psPage = 0;           // 員工清單分頁
 let punchDocItems = [];   // 文件收件勾選項（文件管理的手動項目）
-let punchDeptList = [];   // 部門管理清單
+let punchDeptList = [];   // 案場管理清單
 let punchFieldDefs = [];  // 員工自訂欄位定義
 let _staffPhotoData = null;  // null=不變更、''=清除、data URI=更新
 function initStaffDragSort() {
@@ -4646,6 +4653,8 @@ function openPunchStaffModal(id=null) {
     document.getElementById('psm-phone').value          = s.phone || '';
     document.getElementById('psm-emergency').value      = s.emergency_contact || '';
     document.getElementById('psm-address').value        = s.address || '';
+    document.getElementById('psm-criminal').value       = s.criminal_record || '';
+    document.getElementById('psm-note').value           = s.staff_note || '';
     document.getElementById('psm-username').value       = s.username || '';
     document.getElementById('psm-active').value         = s.active ? '1' : '0';
     document.getElementById('psm-password').value       = s.password_plain || '';
@@ -4660,6 +4669,8 @@ function openPunchStaffModal(id=null) {
   } else {
     ['psm-id','psm-name','psm-code','psm-role','psm-username','psm-password',...allFields].forEach(i => document.getElementById(i).value = '');
     document.getElementById('psm-active').value = '1';
+    document.getElementById('psm-criminal').value = '';
+    document.getElementById('psm-note').value = '';
     document.getElementById('psm-pw-hint').textContent = '新增員工請設定密碼（至少 8 碼），可點「產生」';
   }
   // 照片預覽
@@ -4740,7 +4751,7 @@ function genStaffPw() {
   const el = document.getElementById('psm-password'); el.value = p; el.focus();
 }
 
-/* ── 員工欄位與部門設定 ─────────────────────────────────────── */
+/* ── 員工欄位與案場設定 ─────────────────────────────────────── */
 function openStaffSettings() {
   renderStaffSettings();
   document.getElementById('staff-settings-modal').style.display = 'flex';
@@ -4757,7 +4768,7 @@ function renderStaffSettings() {
       <span style="font-size:11px;color:var(--muted);white-space:nowrap">${d.staff_count} 人</span>
       <button class="btn btn-outline btn-sm" onclick="renameDepartment(${d.id})">儲存</button>
       <button class="btn btn-danger btn-sm" onclick="deleteDepartment(${d.id},'${escHtml(d.name)}')">刪除</button>
-    </div>`).join('') : '<div style="font-size:12px;color:var(--muted)">尚無部門，請在下方新增</div>';
+    </div>`).join('') : '<div style="font-size:12px;color:var(--muted)">尚無案場，請在下方新增</div>';
 
   const fWrap = document.getElementById('ss-field-list');
   const typeZh = { text: '文字', number: '數字', date: '日期' };
@@ -4781,22 +4792,22 @@ async function _refreshSettingsData() {
 }
 async function addDepartment() {
   const name = document.getElementById('ss-dept-new').value.trim();
-  if (!name) { showToast('請輸入部門名稱', 'error'); return; }
+  if (!name) { showToast('請輸入案場名稱', 'error'); return; }
   const { ok } = await api('/api/punch/departments', apiJSON({ name }));
   if (!ok) return;
   document.getElementById('ss-dept-new').value = '';
-  showToast('部門已新增', 'success'); await _refreshSettingsData();
+  showToast('案場已新增', 'success'); await _refreshSettingsData();
 }
 async function renameDepartment(id) {
   const name = document.getElementById('ssd-' + id).value.trim();
-  if (!name) { showToast('請輸入部門名稱', 'error'); return; }
+  if (!name) { showToast('請輸入案場名稱', 'error'); return; }
   const { ok, data } = await api(`/api/punch/departments/${id}`, apiPUT({ name }));
   if (!ok) return;
   showToast(data.renamed_staff > 0 ? `已更名，${data.renamed_staff} 位員工同步更新` : '已儲存', 'success');
   await _refreshSettingsData(); await loadPunchStaff();
 }
 async function deleteDepartment(id, name) {
-  if (!confirm(`確定刪除部門「${name}」？`)) return;
+  if (!confirm(`確定刪除案場「${name}」？`)) return;
   const { ok } = await api(`/api/punch/departments/${id}`, { method: 'DELETE' });
   if (!ok) return;
   showToast('已刪除', 'success'); await _refreshSettingsData();
@@ -4853,6 +4864,8 @@ async function savePunchStaff() {
     phone:          document.getElementById('psm-phone').value.trim(),
     emergency_contact: document.getElementById('psm-emergency').value.trim(),
     address:        document.getElementById('psm-address').value.trim(),
+    criminal_record: document.getElementById('psm-criminal').value,
+    staff_note:     document.getElementById('psm-note').value.trim(),
     password:       pw,
     active:         document.getElementById('psm-active').value === '1',
     bank_code:      document.getElementById('psm-bank-code').value.trim(),
@@ -6522,7 +6535,7 @@ async function openSalDetail(id) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px">
       <div><span style="color:var(--muted)">職員代碼：</span><strong>${escHtml(data.employee_code||'—')}</strong></div>
       <div><span style="color:var(--muted)">姓名：</span><strong>${escHtml(data.staff_name)}</strong></div>
-      <div><span style="color:var(--muted)">部門：</span><strong>${escHtml(data.department||'—')}</strong></div>
+      <div><span style="color:var(--muted)">案場：</span><strong>${escHtml(data.department||'—')}</strong></div>
       <div><span style="color:var(--muted)">月份：</span><strong>${month}</strong></div>
     </div>
     ${leaveInfo}
@@ -6632,7 +6645,7 @@ async function bulkPrintPayslips() {
     return `<div class="slip">
       <div class="hdr">
         <div><div class="co">薪　資　單</div><div class="title">${d.month} 月份</div></div>
-        <div class="info">姓名：<strong>${escHtml(d.staff_name)}</strong><br>代碼：${escHtml(d.employee_code||'—')}<br>部門：${escHtml(d.department||'—')}<br>${isH?'時薪制':'月薪制'}</div>
+        <div class="info">姓名：<strong>${escHtml(d.staff_name)}</strong><br>代碼：${escHtml(d.employee_code||'—')}<br>案場：${escHtml(d.department||'—')}<br>${isH?'時薪制':'月薪制'}</div>
       </div>
       <div class="kpi">
         <div class="kc"><div class="kl">支付總額</div><div class="kv g">$${fmtNum(d.allowance_total)}</div></div>
@@ -6720,7 +6733,7 @@ function printSalarySlip() {
   <div class="info-grid">
     <div class="info-cell info-label">職員代碼</div><div class="info-cell">${escHtml(d.employee_code||'—')}</div>
     <div class="info-cell info-label">姓名</div><div class="info-cell">${escHtml(d.staff_name)}</div>
-    <div class="info-cell info-label">部門</div><div class="info-cell">${escHtml(d.department||'—')}</div>
+    <div class="info-cell info-label">案場</div><div class="info-cell">${escHtml(d.department||'—')}</div>
     <div class="info-cell info-label">支付日期</div><div class="info-cell">${escHtml(d.confirmed_at?d.confirmed_at.slice(0,10):'—')}</div>
   </div>
   <div class="summary">
@@ -8637,10 +8650,10 @@ async function importStaffExcel(input) {
   const data = await resp.json().catch(() => ({}));
   if (!resp.ok) { showToast(data.error || '檔案分析失敗', 'error'); return; }
 
-  const fieldZh = { name:'姓名', employee_code:'員工編號', username:'帳號', department:'部門',
+  const fieldZh = { name:'姓名', employee_code:'員工編號', username:'帳號', department:'案場',
     position_title:'職稱', company:'公司', national_id:'身分證字號', phone:'電話',
     emergency_contact:'緊急聯絡人', gender:'性別', birth_date:'生日', hire_date:'到職日',
-    address:'地址', bank_code:'銀行代碼', bank_name:'銀行', bank_branch:'分行',
+    address:'地址', criminal_record:'前科', staff_note:'備註', bank_code:'銀行代碼', bank_name:'銀行', bank_branch:'分行',
     bank_account:'匯款帳號', account_holder:'戶名', active:'狀態' };
   let html = `<div style="font-size:14px;line-height:2;background:var(--accent-light);border-radius:8px;padding:10px 14px;margin-bottom:12px">
     預覽結果：將<strong style="color:var(--green)"> 新增 ${data.created} </strong>筆、
@@ -10741,7 +10754,7 @@ function renderDocsMatrix() {
 
   const head = `<tr>
     <th style="position:sticky;left:0;background:#f7f9fd;z-index:2;min-width:96px;box-shadow:1px 0 0 var(--border)">姓名</th>
-    <th>部門</th>
+    <th>案場</th>
     ${types.map(t => `<th style="text-align:center;white-space:nowrap;cursor:pointer" onclick="batchMarkColumn(${t.id},'${escHtml(t.name)}')" title="點擊可整欄批次標記">${escHtml(t.name)}${t.required ? '' : '<span style="font-weight:400;color:var(--muted)"> (選)'+'</span>'}</th>`).join('')}
     <th style="text-align:center">缺件數</th>
   </tr>`;
@@ -10961,7 +10974,7 @@ function populateDeptSelect(selectId, items, key = 'department') {
   if (!el) return;
   const cur = el.value;
   const depts = [...new Set(items.map(i => i[key]).filter(Boolean))].sort();
-  el.innerHTML = '<option value="">全部部門</option>' +
+  el.innerHTML = '<option value="">全部案場</option>' +
     depts.map(d => `<option value="${escHtml(d)}"${d===cur?' selected':''}>${escHtml(d)}</option>`).join('');
 }
 

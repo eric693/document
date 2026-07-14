@@ -203,7 +203,7 @@ def api_export_attendance():
         """, params).fetchall()
     PUNCH_LABEL = {'in': '上班打卡', 'out': '下班打卡', 'break_out': '休息開始', 'break_in': '休息結束'}
     wb, ws = _xl_workbook(f'{month} 出勤明細')
-    headers = ['員工代碼', '姓名', '部門', '職稱', '日期', '打卡類型', '時間', '補打卡', 'GPS距離(m)', '地點', '備註']
+    headers = ['員工代碼', '姓名', '案場', '職稱', '日期', '打卡類型', '時間', '補打卡', 'GPS距離(m)', '地點', '備註']
     widths  = [10, 10, 12, 12, 12, 10, 8, 7, 11, 14, 20]
     _xl_write_header(ws, headers, widths)
     _xl_write_rows(ws, [
@@ -237,7 +237,7 @@ def api_export_attendance_summary():
             ORDER BY ps.name, (pr.punched_at AT TIME ZONE 'Asia/Taipei')::date
         """, (month,)).fetchall()
     wb, ws = _xl_workbook(f'{month} 出勤摘要')
-    headers = ['員工代碼', '姓名', '部門', '職稱', '日期', '上班', '下班', '工時(h)', '打卡次數', '含補打']
+    headers = ['員工代碼', '姓名', '案場', '職稱', '日期', '上班', '下班', '工時(h)', '打卡次數', '含補打']
     widths  = [10, 10, 12, 12, 12, 8, 8, 9, 9, 7]
     _xl_write_header(ws, headers, widths)
     data = []
@@ -369,7 +369,7 @@ def api_anomaly_report_excel():
     warn_fill   = PatternFill('solid', fgColor='FFF3CD')
     err_fill    = PatternFill('solid', fgColor='FDECEA')
     center_align = Alignment(horizontal='center', vertical='center')
-    headers = ['員工姓名', '部門', '日期', '應上班', '應下班', '實際上班', '實際下班', '異常類型', '說明']
+    headers = ['員工姓名', '案場', '日期', '應上班', '應下班', '實際上班', '實際下班', '異常類型', '說明']
     col_w   = [12, 10, 12, 8, 8, 8, 8, 12, 30]
     for ci, (h, w) in enumerate(zip(headers, col_w), 1):
         cell = ws.cell(row=1, column=ci, value=h)
@@ -416,7 +416,7 @@ def api_export_salary():
         """, (month,)).fetchall()
     leave_map = {r['staff_id']: r for r in leave_detail}
     wb, ws = _xl_workbook(f'{month} 薪資明細')
-    headers = ['員工代碼', '姓名', '部門', '職稱', '薪資制度',
+    headers = ['員工代碼', '姓名', '案場', '職稱', '薪資制度',
                '工作日', '出勤天數', '請假天數', '無薪假天數', '事假天數', '病假天數',
                '津貼合計', '扣除合計', '加班費', '實領金額', '狀態', '備註']
     widths  = [10, 10, 12, 12, 8, 8, 8, 8, 9, 8, 8, 11, 11, 10, 12, 8, 20]
@@ -459,7 +459,7 @@ def api_export_leave():
     PAY_LABEL = {1.0: '全薪', 0.5: '半薪', 0.0: '無薪'}
     STATUS_LABEL = {'approved': '已核准', 'rejected': '已退回', 'pending': '待審核'}
     wb, ws = _xl_workbook('請假記錄')
-    headers = ['員工代碼', '姓名', '部門', '假別', '薪資倍率', '開始日期', '結束日期', '天數', '原因', '代理人', '狀態']
+    headers = ['員工代碼', '姓名', '案場', '假別', '薪資倍率', '開始日期', '結束日期', '天數', '原因', '代理人', '狀態']
     widths  = [10, 10, 12, 10, 8, 12, 12, 7, 24, 10, 8]
     _xl_write_header(ws, headers, widths)
     _xl_write_rows(ws, [
@@ -491,7 +491,7 @@ def api_export_overtime():
         """, params).fetchall()
     STATUS_LABEL = {'approved': '已核准', 'rejected': '已退回', 'pending': '待審核'}
     wb, ws = _xl_workbook('加班記錄')
-    headers = ['員工代碼', '姓名', '部門', '職稱', '加班日期', '開始時間', '結束時間', '時數', '原因', '加班費', '狀態']
+    headers = ['員工代碼', '姓名', '案場', '職稱', '加班日期', '開始時間', '結束時間', '時數', '原因', '加班費', '狀態']
     widths  = [10, 10, 12, 12, 12, 8, 8, 7, 24, 10, 8]
     _xl_write_header(ws, headers, widths)
     _xl_write_rows(ws, [
@@ -523,7 +523,7 @@ def api_export_staff():
             FROM punch_staff WHERE {' AND '.join(conds)} ORDER BY department, name
         """, params).fetchall()
     wb, ws = _xl_workbook('員工資料')
-    headers = ['員工代碼', '姓名', '部門', '職稱', '職務', '薪資制度', '底薪', '投保薪資', '每日工時', '到職日', '生日', '狀態', '帳號', 'LINE綁定']
+    headers = ['員工代碼', '姓名', '案場', '職稱', '職務', '薪資制度', '底薪', '投保薪資', '每日工時', '到職日', '生日', '狀態', '帳號', 'LINE綁定']
     widths  = [10, 10, 12, 12, 12, 8, 11, 11, 8, 12, 12, 6, 12, 8]
     _xl_write_header(ws, headers, widths)
     _xl_write_rows(ws, [
@@ -559,7 +559,7 @@ def api_export_expense():
         """, params).fetchall()
     STATUS_LABEL = {'approved': '已核准', 'rejected': '已退回', 'pending': '待審核'}
     wb, ws = _xl_workbook('費用報帳')
-    headers = ['員工代碼', '姓名', '部門', '費用日期', '標題', '金額', '說明', '狀態', '審核人', '申請時間']
+    headers = ['員工代碼', '姓名', '案場', '費用日期', '標題', '金額', '說明', '狀態', '審核人', '申請時間']
     widths  = [10, 10, 12, 12, 24, 11, 30, 8, 10, 16]
     _xl_write_header(ws, headers, widths)
     _xl_write_rows(ws, [
@@ -588,7 +588,7 @@ def api_export_leave_balance():
             WHERE lb.year = %s ORDER BY ps.department, ps.name, lt.sort_order
         """, (int(year),)).fetchall()
     wb, ws = _xl_workbook(f'{year} 請假餘額')
-    headers = ['員工代碼', '姓名', '部門', '假別', '假別代碼', '年度上限(天)', '已核准(天)', '剩餘(天)']
+    headers = ['員工代碼', '姓名', '案場', '假別', '假別代碼', '年度上限(天)', '已核准(天)', '剩餘(天)']
     widths  = [10, 10, 12, 12, 8, 11, 11, 10]
     _xl_write_header(ws, headers, widths)
     _xl_write_rows(ws, [
@@ -707,7 +707,7 @@ def api_export_attendance_pdf():
             WHERE {' AND '.join(conds)} ORDER BY ps.name, pr.punched_at
         """, params).fetchall()
     PUNCH_LABEL = {'in': '上班', 'out': '下班', 'break_out': '休息開始', 'break_in': '休息結束'}
-    headers   = ['員工代碼', '姓名', '部門', '日期', '打卡類型', '時間', '補打', '地點']
+    headers   = ['員工代碼', '姓名', '案場', '日期', '打卡類型', '時間', '補打', '地點']
     col_widths = [55, 55, 60, 65, 60, 45, 30, 70]
     data = [[r['employee_code'] or '', r['staff_name'], r['department'] or '',
              str(r['work_date']), PUNCH_LABEL.get(r['punch_type'], r['punch_type']),
@@ -737,7 +737,7 @@ def api_export_attendance_summary_pdf():
                      (pr.punched_at AT TIME ZONE 'Asia/Taipei')::date
             ORDER BY ps.name, (pr.punched_at AT TIME ZONE 'Asia/Taipei')::date
         """, (month,)).fetchall()
-    headers    = ['員工代碼', '姓名', '部門', '日期', '上班', '下班', '工時(h)', '打卡次數', '含補打']
+    headers    = ['員工代碼', '姓名', '案場', '日期', '上班', '下班', '工時(h)', '打卡次數', '含補打']
     col_widths = [55, 55, 60, 65, 45, 45, 50, 55, 40]
     data = []
     for r in rows:
@@ -849,7 +849,7 @@ def api_anomaly_report_pdf():
                           str(sr['start_time'])[:5], str(sr['end_time'])[:5],
                           '—', '—', '未打卡', f"排班{str(sr['start_time'])[:5]}~{str(sr['end_time'])[:5]}"])
     anomalies.sort(key=lambda x: (x[2], x[0]))
-    headers    = ['姓名', '部門', '日期', '應上班', '應下班', '實際上班', '實際下班', '異常類型', '說明']
+    headers    = ['姓名', '案場', '日期', '應上班', '應下班', '實際上班', '實際下班', '異常類型', '說明']
     col_widths = [55, 55, 65, 45, 45, 50, 50, 55, 120]
     buf = _build_pdf(f'{month} 出勤異常報告', f'製表：{_tw_today().isoformat()}  共 {len(anomalies)} 筆',
                      headers, col_widths, anomalies, landscape=True)
@@ -866,7 +866,7 @@ def api_export_salary_pdf():
             FROM salary_records sr JOIN punch_staff ps ON ps.id = sr.staff_id
             WHERE sr.month = %s ORDER BY ps.name
         """, (month,)).fetchall()
-    headers    = ['代碼', '姓名', '部門', '薪資制', '工作日', '出勤', '請假', '無薪假', '津貼', '扣除', '加班費', '實領', '狀態']
+    headers    = ['代碼', '姓名', '案場', '薪資制', '工作日', '出勤', '請假', '無薪假', '津貼', '扣除', '加班費', '實領', '狀態']
     col_widths = [45, 55, 60, 45, 40, 40, 40, 45, 55, 55, 55, 65, 40]
     data = [[r['employee_code'] or '', r['staff_name'], r['department'] or '',
              '時薪' if r['salary_type'] == 'hourly' else '月薪',
@@ -903,7 +903,7 @@ def api_export_leave_pdf():
         """, params).fetchall()
     PAY_LABEL    = {1.0: '全薪', 0.5: '半薪', 0.0: '無薪'}
     STATUS_LABEL = {'approved': '已核准', 'rejected': '已退回', 'pending': '待審核'}
-    headers    = ['員工代碼', '姓名', '部門', '假別', '薪資倍率', '開始日期', '結束日期', '天數', '原因', '代理人', '狀態']
+    headers    = ['員工代碼', '姓名', '案場', '假別', '薪資倍率', '開始日期', '結束日期', '天數', '原因', '代理人', '狀態']
     col_widths = [50, 55, 60, 55, 50, 65, 65, 35, 100, 55, 45]
     data = [[r['employee_code'] or '', r['staff_name'], r['department'] or '',
              r['leave_type_name'], PAY_LABEL.get(float(r['pay_rate']), f"{r['pay_rate']}倍"),
@@ -929,7 +929,7 @@ def api_export_leave_balance_pdf():
             JOIN leave_types lt ON lt.id = lb.leave_type_id
             WHERE lb.year = %s ORDER BY ps.department, ps.name, lt.sort_order
         """, (int(year),)).fetchall()
-    headers    = ['員工代碼', '姓名', '部門', '假別', '假別代碼', '年度上限(天)', '已核准(天)', '剩餘(天)']
+    headers    = ['員工代碼', '姓名', '案場', '假別', '假別代碼', '年度上限(天)', '已核准(天)', '剩餘(天)']
     col_widths = [55, 55, 65, 65, 50, 65, 65, 55]
     data = [[r['employee_code'] or '', r['staff_name'], r['department'] or '',
              r['leave_type_name'], r['leave_code'] or '',
@@ -959,7 +959,7 @@ def api_export_overtime_pdf():
             WHERE {' AND '.join(conds)} ORDER BY r.request_date DESC, ps.name
         """, params).fetchall()
     STATUS_LABEL = {'approved': '已核准', 'rejected': '已退回', 'pending': '待審核'}
-    headers    = ['員工代碼', '姓名', '部門', '加班日期', '開始', '結束', '時數', '原因', '加班費', '狀態']
+    headers    = ['員工代碼', '姓名', '案場', '加班日期', '開始', '結束', '時數', '原因', '加班費', '狀態']
     col_widths = [50, 55, 60, 65, 42, 42, 38, 90, 55, 45]
     data = [[r['employee_code'] or '', r['staff_name'], r['department'] or '',
              str(r['request_date']), str(r['start_time'] or '')[:5], str(r['end_time'] or '')[:5],
@@ -987,7 +987,7 @@ def api_export_staff_pdf():
                    salary_type, base_salary, insured_salary, hire_date, active
             FROM punch_staff WHERE {' AND '.join(conds)} ORDER BY department, name
         """, params).fetchall()
-    headers    = ['員工代碼', '姓名', '部門', '職稱', '職務', '薪資制', '底薪', '投保薪資', '到職日', '狀態']
+    headers    = ['員工代碼', '姓名', '案場', '職稱', '職務', '薪資制', '底薪', '投保薪資', '到職日', '狀態']
     col_widths = [55, 55, 65, 65, 65, 45, 60, 65, 65, 40]
     data = [[r['employee_code'] or '', r['name'], r['department'] or '', r['role'] or '',
              r['position_title'] or '', '時薪' if r['salary_type'] == 'hourly' else '月薪',
@@ -1016,7 +1016,7 @@ def api_export_training_pdf():
     CATEGORY_ZH = {'safety': '安全衛生', 'fire': '消防', 'food': '食品衛生',
                    'professional': '專業技能', 'general': '一般訓練'}
     today = _tw_today()
-    headers    = ['員工姓名', '部門', '課程名稱', '類別', '完訓日期', '到期日', '剩餘天數', '狀態']
+    headers    = ['員工姓名', '案場', '課程名稱', '類別', '完訓日期', '到期日', '剩餘天數', '狀態']
     col_widths = [55, 60, 110, 60, 65, 65, 55, 55]
     data = []
     for r in rows:
@@ -1053,7 +1053,7 @@ def api_export_expense_pdf():
             WHERE {' AND '.join(conds)} ORDER BY ec.expense_date DESC
         """, params).fetchall()
     STATUS_LABEL = {'approved': '已核准', 'rejected': '已退回', 'pending': '待審核'}
-    headers    = ['員工代碼', '姓名', '部門', '費用日期', '標題', '金額', '說明', '狀態']
+    headers    = ['員工代碼', '姓名', '案場', '費用日期', '標題', '金額', '說明', '狀態']
     col_widths = [50, 55, 60, 65, 100, 60, 110, 45]
     data = [[r['employee_code'] or '', r['staff_name'], r['department'] or '',
              str(r['expense_date']) if r.get('expense_date') else '',
@@ -1313,7 +1313,7 @@ def api_export_documents_pdf():
         types, staff_rows = _build_matrix(conn)
         emp_map = {s['id']: (s['employee_code'] or '')
                    for s in conn.execute('SELECT id, employee_code FROM punch_staff').fetchall()}
-    headers = ['姓名', '部門'] + [t['name'] for t in types] + ['缺件']
+    headers = ['姓名', '案場'] + [t['name'] for t in types] + ['缺件']
     id_w = [55, 55]
     type_w = [26] * len(types)
     col_widths = id_w + type_w + [32]

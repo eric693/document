@@ -258,6 +258,8 @@ def init_db():
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS company TEXT DEFAULT ''",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS phone TEXT DEFAULT ''",
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS emergency_contact TEXT DEFAULT ''",
+        "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS criminal_record TEXT DEFAULT ''",
+        "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS staff_note TEXT DEFAULT ''",
         # 員工自訂欄位（管理員自行新增的欄位，值存 JSONB {欄位名: 值}）
         "ALTER TABLE punch_staff ADD COLUMN IF NOT EXISTS custom_fields JSONB DEFAULT '{}'::jsonb",
         """CREATE TABLE IF NOT EXISTS staff_field_defs (

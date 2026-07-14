@@ -507,7 +507,7 @@ def api_punch_staff_list():
                    termination_reason, created_at, bank_code, bank_name, bank_branch,
                    bank_account, account_holder, salary_notes, national_id, gender,
                    insurance_type, address, company, phone, emergency_contact,
-                   custom_fields, password_plain,
+                   criminal_record, staff_note, custom_fields, password_plain,
                    (COALESCE(photo_data,'') <> '') AS has_photo
             FROM punch_staff ORDER BY sort_order, name""").fetchall()
         # 文件收件狀態（手動登記項目，供員工表單勾選預填）
@@ -532,7 +532,7 @@ def api_punch_staff_list():
                      'bank_code', 'bank_name', 'bank_branch', 'bank_account',
                      'account_holder', 'birth_date', 'termination_reason', 'password_plain',
                      'national_id', 'phone', 'emergency_contact', 'address', 'doc_status',
-                     'custom_fields')
+                     'custom_fields', 'criminal_record', 'staff_note')
         for d in result:
             for k in SENSITIVE:
                 d.pop(k, None)
@@ -639,7 +639,7 @@ def api_field_defs_delete(fid):
     return jsonify({'ok': True})
 
 
-# ─── 部門管理 ─────────────────────────────────────────────────────────────────
+# ─── 案場管理 ─────────────────────────────────────────────────────────────────
 
 @bp.route('/api/punch/departments', methods=['GET'])
 @login_required
@@ -658,14 +658,14 @@ def api_departments_create():
     b = request.get_json(force=True) or {}
     name = (b.get('name') or '').strip()
     if not name:
-        return jsonify({'error': '請輸入部門名稱'}), 400
+        return jsonify({'error': '請輸入案場名稱'}), 400
     try:
         with get_db() as conn:
             row = conn.execute("INSERT INTO departments (name) VALUES (%s) RETURNING id", (name,)).fetchone()
-        log_action('新增部門', name)
+        log_action('新增案場', name)
         return jsonify({'ok': True, 'id': row['id']})
     except psycopg.errors.UniqueViolation:
-        return jsonify({'error': '已有同名部門'}), 400
+        return jsonify({'error': '已有同名案場'}), 400
 
 
 @bp.route('/api/punch/departments/<int:did>', methods=['PUT'])
@@ -674,23 +674,23 @@ def api_departments_update(did):
     b = request.get_json(force=True) or {}
     name = (b.get('name') or '').strip()
     if not name:
-        return jsonify({'error': '請輸入部門名稱'}), 400
+        return jsonify({'error': '請輸入案場名稱'}), 400
     try:
         with get_db() as conn:
             old = conn.execute("SELECT name FROM departments WHERE id=%s", (did,)).fetchone()
             if not old:
-                return jsonify({'error': '部門不存在'}), 404
+                return jsonify({'error': '案場不存在'}), 404
             conn.execute("UPDATE departments SET name=%s WHERE id=%s", (name, did))
             renamed = 0
             if old['name'] != name:
-                # 改名同步更新所有員工的部門
+                # 改名同步更新所有員工的案場
                 cur = conn.execute("UPDATE punch_staff SET department=%s WHERE department=%s",
                                    (name, old['name']))
                 renamed = cur.rowcount
-        log_action('部門更名', f"{old['name']} → {name}", f'{renamed} 位員工同步更新')
+        log_action('案場更名', f"{old['name']} → {name}", f'{renamed} 位員工同步更新')
         return jsonify({'ok': True, 'renamed_staff': renamed})
     except psycopg.errors.UniqueViolation:
-        return jsonify({'error': '已有同名部門'}), 400
+        return jsonify({'error': '已有同名案場'}), 400
 
 
 @bp.route('/api/punch/departments/<int:did>', methods=['DELETE'])
@@ -699,14 +699,14 @@ def api_departments_delete(did):
     with get_db() as conn:
         old = conn.execute("SELECT name FROM departments WHERE id=%s", (did,)).fetchone()
         if not old:
-            return jsonify({'error': '部門不存在'}), 404
+            return jsonify({'error': '案場不存在'}), 404
         used = conn.execute(
             "SELECT COUNT(*) AS c FROM punch_staff WHERE department=%s AND active=TRUE",
             (old['name'],)).fetchone()
         if used['c'] > 0:
-            return jsonify({'error': f'仍有 {used["c"]} 位在職員工屬於此部門，請先調整員工部門'}), 409
+            return jsonify({'error': f'仍有 {used["c"]} 位在職員工屬於此案場，請先調整員工案場'}), 409
         conn.execute("DELETE FROM departments WHERE id=%s", (did,))
-    log_action('刪除部門', old['name'])
+    log_action('刪除案場', old['name'])
     return jsonify({'ok': True})
 
 
@@ -790,6 +790,8 @@ def api_punch_staff_create():
     phone             = (b.get('phone') or '').strip()
     emergency_contact = (b.get('emergency_contact') or '').strip()
     address           = (b.get('address') or '').strip()
+    criminal_record   = b.get('criminal_record') if b.get('criminal_record') in ('有', '無') else ''
+    staff_note        = (b.get('staff_note') or '').strip()[:2000]
     photo             = _clean_photo(b) or ''
     try:
         with get_db() as conn:
@@ -799,12 +801,12 @@ def api_punch_staff_create():
                   (name, username, password_hash, password_plain, role, position_title, employee_code,
                    department, hire_date, birth_date,
                    bank_code, bank_name, bank_branch, bank_account, account_holder,
-                   company, national_id, phone, emergency_contact, address, photo_data, custom_fields)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *
+                   company, national_id, phone, emergency_contact, address, criminal_record, staff_note, photo_data, custom_fields)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *
             """, (name, username, hash_password(password), password, role, role, employee_code,
                   department, hire_date, birth_date,
                   bank_code, bank_name, bank_branch, bank_account, account_holder,
-                  company, national_id, phone, emergency_contact, address, photo, Json(cf))).fetchone()
+                  company, national_id, phone, emergency_contact, address, criminal_record, staff_note, photo, Json(cf))).fetchone()
             _apply_staff_documents(conn, row['id'], b.get('documents'))
         log_action('新增員工', name, f'帳號 {username}')
         return jsonify(punch_staff_row(row)), 201
@@ -839,6 +841,8 @@ def api_punch_staff_update(sid):
     phone             = (b.get('phone') or '').strip()
     emergency_contact = (b.get('emergency_contact') or '').strip()
     address           = (b.get('address') or '').strip()
+    criminal_record   = b.get('criminal_record') if b.get('criminal_record') in ('有', '無') else ''
+    staff_note        = (b.get('staff_note') or '').strip()[:2000]
     photo             = _clean_photo(b)   # None=不更新
     if not name or not username:
         return jsonify({'error': '姓名和帳號為必填'}), 400
@@ -859,24 +863,24 @@ def api_punch_staff_update(sid):
                 SET name=%s,username=%s,password_hash=%s,password_plain=%s,role=%s,position_title=%s,active=%s,employee_code=%s,
                     department=%s,hire_date=%s,birth_date=%s,
                     bank_code=%s,bank_name=%s,bank_branch=%s,bank_account=%s,account_holder=%s,
-                    company=%s,national_id=%s,phone=%s,emergency_contact=%s,address=%s{extra_sql}
+                    company=%s,national_id=%s,phone=%s,emergency_contact=%s,address=%s,criminal_record=%s,staff_note=%s{extra_sql}
                 WHERE id=%s RETURNING *
             """, [name, username, hash_password(password), password, role, role, active, employee_code,
                   department, hire_date, birth_date,
                   bank_code, bank_name, bank_branch, bank_account, account_holder,
-                  company, national_id, phone, emergency_contact, address] + extra_vals + [sid]).fetchone()
+                  company, national_id, phone, emergency_contact, address, criminal_record, staff_note] + extra_vals + [sid]).fetchone()
         else:
             row = conn.execute(f"""
                 UPDATE punch_staff
                 SET name=%s,username=%s,role=%s,position_title=%s,active=%s,employee_code=%s,
                     department=%s,hire_date=%s,birth_date=%s,
                     bank_code=%s,bank_name=%s,bank_branch=%s,bank_account=%s,account_holder=%s,
-                    company=%s,national_id=%s,phone=%s,emergency_contact=%s,address=%s{extra_sql}
+                    company=%s,national_id=%s,phone=%s,emergency_contact=%s,address=%s,criminal_record=%s,staff_note=%s{extra_sql}
                 WHERE id=%s RETURNING *
             """, [name, username, role, role, active, employee_code,
                   department, hire_date, birth_date,
                   bank_code, bank_name, bank_branch, bank_account, account_holder,
-                  company, national_id, phone, emergency_contact, address] + extra_vals + [sid]).fetchone()
+                  company, national_id, phone, emergency_contact, address, criminal_record, staff_note] + extra_vals + [sid]).fetchone()
         if row:
             _apply_staff_documents(conn, sid, b.get('documents'))
     if row:
