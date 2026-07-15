@@ -32,15 +32,7 @@ STAFF_FIELD_WHITELIST = {
 
 # 預設文件項目（首次建表時 seed）
 DEFAULT_DOC_TYPES = [
-    ('姓名',       'name'),
     ('照片',       'photo_data'),
-    ('員工編號',   'employee_code'),
-    ('公司',       'company'),
-    ('身分證字號', 'national_id'),
-    ('電話',       'phone'),
-    ('緊急聯絡人', 'emergency_contact'),
-    ('地址',       'address'),
-    ('帳號',       'bank_account'),
     ('體檢表',     ''),
     ('健檢表',     ''),
     ('印章',       ''),
@@ -48,6 +40,11 @@ DEFAULT_DOC_TYPES = [
     ('安檢函',     ''),
     ('約定書84-1', ''),
     ('勞動契約',   ''),
+    ('員工自願書', ''),
+    ('保人資料',   ''),
+    ('投保切結書', ''),
+    ('獎懲細則',   ''),
+    ('保全護照',   ''),
 ]
 
 

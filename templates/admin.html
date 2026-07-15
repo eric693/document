@@ -2382,26 +2382,6 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <div class="fm-section">
         <div class="fm-sec-head"><span class="dot"></span><span class="t">基本資料</span><span class="line"></span></div>
         <div class="form-grid">
-          <div class="form-group"><label class="form-label">姓名 *</label><input class="form-input" id="psm-name" placeholder="員工姓名" style="font-family:'Noto Sans TC',sans-serif" oninput="if(!document.getElementById('psm-account-holder').value)document.getElementById('psm-account-holder').value=this.value"></div>
-          <div class="form-group"><label class="form-label">員工編號</label><input class="form-input" id="psm-code" placeholder="例：EMP001"></div>
-          <div class="form-group"><label class="form-label">公司</label><input class="form-input" id="psm-company" placeholder="例：永興公司" style="font-family:'Noto Sans TC',sans-serif"></div>
-          <div class="form-group"><label class="form-label">案場</label><input class="form-input" id="psm-department" placeholder="例：門市部" list="dept-datalist" style="font-family:'Noto Sans TC',sans-serif"><datalist id="dept-datalist"></datalist><div class="fm-note">可選既有案場或直接輸入新案場，篩選器會自動更新</div></div>
-          <div class="form-group"><label class="form-label">職稱</label><input class="form-input" id="psm-role" placeholder="例：店員" style="font-family:'Noto Sans TC',sans-serif"></div>
-          <div class="form-group"><label class="form-label">在職狀態</label><select class="form-input" id="psm-active"><option value="1">在職</option><option value="0">停用</option></select></div>
-          <div class="form-group"><label class="form-label">前科</label><select class="form-input" id="psm-criminal"><option value="">未填</option><option value="無">無</option><option value="有">有</option></select></div>
-          <div class="form-group"><label class="form-label">到職日</label><input class="form-input" type="date" id="psm-hire-date"></div>
-          <div class="form-group"><label class="form-label">生日</label><input class="form-input" type="date" id="psm-birth-date"></div>
-        </div>
-      </div>
-
-      <!-- 個人資料 -->
-      <div class="fm-section">
-        <div class="fm-sec-head"><span class="dot"></span><span class="t">個人資料</span><span class="line"></span></div>
-        <div class="form-grid">
-          <div class="form-group"><label class="form-label">身分證字號（ID）</label><input class="form-input" id="psm-national-id" placeholder="例：A123456789" autocapitalize="characters"></div>
-          <div class="form-group"><label class="form-label">電話</label><input class="form-input" id="psm-phone" placeholder="例：0912345678" inputmode="tel"></div>
-          <div class="form-group full-width"><label class="form-label">緊急聯絡人</label><input class="form-input" id="psm-emergency" placeholder="例：王大明 0987654321（姓名＋電話）" style="font-family:'Noto Sans TC',sans-serif"></div>
-          <div class="form-group full-width"><label class="form-label">地址</label><input class="form-input" id="psm-address" placeholder="戶籍或通訊地址" style="font-family:'Noto Sans TC',sans-serif"></div>
           <div class="form-group full-width"><label class="form-label">照片</label>
             <div style="display:flex;gap:14px;align-items:center">
               <div id="psm-photo-preview-wrap" style="width:72px;height:72px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0">
@@ -2418,6 +2398,22 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
               <input type="file" id="psm-photo-input" accept="image/*" style="display:none" onchange="staffPhotoSelected(event)">
             </div>
           </div>
+          <div class="form-group"><label class="form-label">員工編號</label><input class="form-input" id="psm-code" placeholder="例：EMP001"></div>
+          <div class="form-group"><label class="form-label">姓名 *</label><input class="form-input" id="psm-name" placeholder="員工姓名" style="font-family:'Noto Sans TC',sans-serif" oninput="if(!document.getElementById('psm-account-holder').value)document.getElementById('psm-account-holder').value=this.value"></div>
+          <div class="form-group"><label class="form-label">身分證字號（ID）</label><input class="form-input" id="psm-national-id" placeholder="例：A123456789" autocapitalize="characters"></div>
+          <div class="form-group"><label class="form-label">生日</label><input class="form-input" type="date" id="psm-birth-date"></div>
+          <div class="form-group"><label class="form-label">電話</label><input class="form-input" id="psm-phone" placeholder="例：0912345678" inputmode="tel"></div>
+          <div class="form-group" data-cf-slot="住家電話" style="display:none"></div>
+          <div class="form-group full-width"><label class="form-label">緊急聯絡人</label><input class="form-input" id="psm-emergency" placeholder="例：王大明 0987654321（姓名＋電話）" style="font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="form-group full-width"><label class="form-label">地址</label><input class="form-input" id="psm-address" placeholder="戶籍或通訊地址" style="font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="form-group"><label class="form-label">案場</label><input class="form-input" id="psm-department" placeholder="例：門市部" list="dept-datalist" style="font-family:'Noto Sans TC',sans-serif"><datalist id="dept-datalist"></datalist><div class="fm-note">可選既有案場或直接輸入新案場，篩選器會自動更新</div></div>
+          <div class="form-group"><label class="form-label">職稱</label><input class="form-input" id="psm-role" placeholder="例：店員" style="font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="form-group"><label class="form-label">公司</label><input class="form-input" id="psm-company" placeholder="例：永興公司" style="font-family:'Noto Sans TC',sans-serif"></div>
+          <div class="form-group"><label class="form-label">前科</label><select class="form-input" id="psm-criminal"><option value="">未填</option><option value="無">無</option><option value="有">有</option></select></div>
+          <div class="form-group" data-cf-slot="安檢日期" style="display:none"></div>
+          <div class="form-group" data-cf-slot="84-1核備" style="display:none"></div>
+          <div class="form-group"><label class="form-label">到職日</label><input class="form-input" type="date" id="psm-hire-date"></div>
+          <div class="form-group"><label class="form-label">在職狀態</label><select class="form-input" id="psm-active"><option value="1">在職</option><option value="0">停用</option></select></div>
         </div>
       </div>
 
@@ -3333,7 +3329,7 @@ const ADMIN_DISPLAY_NAME = {{ admin_display_name | tojson }};
 const ADMIN_PERMS        = {{ admin_permissions  | tojson }};
 const ADMIN_IS_SUPER     = {{ admin_is_super     | tojson }};
 const ALL_MODULES = [
-  { key:'punch',          label:'打卡管理' },
+  { key:'punch',          label:'員工管理' },
   { key:'sched',          label:'排班管理' },
   { key:'leave',          label:'請假管理' },
   { key:'salary',         label:'薪資管理' },
@@ -4581,10 +4577,8 @@ async function loadPunchStaff() {
   refreshDeptDatalist();
   renderPunchStaff();
   initStaffDragSort();
-  if (!punchDocItems.length) {
-    const r = await api('/api/punch/doc-items', {}, true);
-    if (r.ok) punchDocItems = r.data;
-  }
+  const rDoc = await api('/api/punch/doc-items', {}, true);
+  if (rDoc.ok) punchDocItems = rDoc.data;
 }
 function refreshDeptDatalist() {
   // 員工表單的案場建議清單 = 案場管理清單 ∪ 員工現有案場
@@ -4687,18 +4681,26 @@ function openPunchStaffModal(id=null) {
     img.style.display = 'none'; img.src = ''; ph.style.display = ''; clr.style.display = 'none';
   }
   document.getElementById('psm-photo-input').value = '';
-  // 自訂欄位
+  // 自訂欄位：主表單有對應插槽（data-cf-slot）的直接嵌入，其餘放「自訂欄位」區
   const cfSec = document.getElementById('psm-custom-section');
   const cfGrid = document.getElementById('psm-custom-grid');
   const activeDefs = punchFieldDefs.filter(f => f.active);
-  if (activeDefs.length) {
-    const cfVals = (s && s.custom_fields) || {};
-    cfGrid.innerHTML = activeDefs.map(f => {
-      const t = f.field_type === 'number' ? 'number' : (f.field_type === 'date' ? 'date' : 'text');
-      const v = cfVals[f.name] != null ? String(cfVals[f.name]) : '';
-      return `<div class="form-group"><label class="form-label">${escHtml(f.name)}</label>
-        <input class="form-input psm-cf" data-cf-name="${escHtml(f.name)}" type="${t}" value="${escHtml(v)}"${t==='text' ? ` style="font-family:'Noto Sans TC',sans-serif"` : ''}></div>`;
-    }).join('');
+  document.querySelectorAll('#punch-staff-modal [data-cf-slot]').forEach(el => {
+    el.innerHTML = ''; el.style.display = 'none';
+  });
+  const cfVals = (s && s.custom_fields) || {};
+  const leftovers = [];
+  activeDefs.forEach(f => {
+    const t = f.field_type === 'number' ? 'number' : (f.field_type === 'date' ? 'date' : 'text');
+    const v = cfVals[f.name] != null ? String(cfVals[f.name]) : '';
+    const inner = `<label class="form-label">${escHtml(f.name)}</label>
+      <input class="form-input psm-cf" data-cf-name="${escHtml(f.name)}" type="${t}" value="${escHtml(v)}"${t==='text' ? ` style="font-family:'Noto Sans TC',sans-serif"` : ''}>`;
+    const slot = document.querySelector(`#punch-staff-modal [data-cf-slot="${CSS.escape(f.name)}"]`);
+    if (slot) { slot.innerHTML = inner; slot.style.display = ''; }
+    else leftovers.push(`<div class="form-group">${inner}</div>`);
+  });
+  if (leftovers.length) {
+    cfGrid.innerHTML = leftovers.join('');
     cfSec.style.display = '';
   } else {
     cfGrid.innerHTML = ''; cfSec.style.display = 'none';

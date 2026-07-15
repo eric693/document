@@ -676,7 +676,7 @@ def mobile_admin_overtime_action(oid):
     # 與網頁版 api_ot_review 同步：核准需計算加班費並重算薪資草稿
     from blueprints.overtime import _calc_ot_pay
     if not _mobile_has_module('punch'):
-        return jsonify({'error': '無「打卡管理」模組權限'}), 403
+        return jsonify({'error': '無「員工管理」模組權限'}), 403
     b = request.get_json(force=True) or {}
     action = b.get('action')
     if action not in ('approve', 'reject'):
