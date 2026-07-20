@@ -169,9 +169,11 @@ def _staff_wb(rows_data, extra_headers=None):
         ['2. 空白儲存格＝不變更該欄位（更新時不會清空既有資料）。'],
         ['3. 新增員工時「姓名」為必填；帳號留空會自動以員工編號或系統代碼產生。'],
         ['4. 新增員工時「密碼」留空會自動產生 8 碼亂數，匯入結果會列出帳號密碼。'],
-        ['5. 日期可用 2024-01-05、2024/1/5 或民國年（113/01/05）。'],
+        ['5. 日期可用 2024-01-05、2024/1/5 或民國年（113/01/05）；'
+         '自訂的日期欄位（如安檢日期、84-1核備）格式相同，匯入時會自動轉換。'],
         ['6. 狀態欄填「在職」或「離職」，留空視為在職。'],
         ['7. 「密碼」欄只用於匯入，匯出時一律留空。'],
+        ['8. 表頭最右側為自訂欄位，欄名需與系統設定的欄位名稱完全一致才會匯入。'],
     ]:
         note.append(line)
     note.column_dimensions['A'].width = 80
@@ -264,11 +266,11 @@ def staff_import():
 
     with get_db() as conn:
         # 自訂欄位：表頭比對啟用中的欄位定義（固定欄位優先）
-        def_names = {d['name'] for d in _active_field_defs(conn)}
+        cf_types = {d['name']: d.get('field_type') for d in _active_field_defs(conn)}
         cf_idx = {}   # 欄位名 -> column index
         for i, h in enumerate(header):
             h = h.strip()
-            if h in def_names and h not in zh_to_field:
+            if h in cf_types and h not in zh_to_field:
                 cf_idx[h] = i
 
         for rownum, r in enumerate(rows[1:], start=2):
@@ -279,8 +281,16 @@ def staff_import():
             cf = {}
             for cfname, ci in cf_idx.items():
                 v = r[ci].strip() if ci < len(r) else ''
-                if v != '':
-                    cf[cfname] = v
+                if v == '':
+                    continue
+                if cf_types.get(cfname) == 'date':
+                    # 日期型自訂欄位一律轉 ISO，否則表單的 date input 讀不到
+                    d = _parse_date(v)
+                    if not d:
+                        errors.append(f'第 {rownum} 列：{cfname}「{v}」不是有效日期，該欄已略過')
+                        continue
+                    v = d
+                cf[cfname] = v
 
             name = val('name')
             emp  = val('employee_code')
