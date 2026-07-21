@@ -8185,7 +8185,7 @@ function renderOcrQueue() {
           <div style="flex:0 0 auto;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--muted)" title="${escHtml(q.file.name)}">${escHtml(q.file.name)}</div>
           <div style="flex:0 0 auto;min-width:70px">${statusBadge(q.status)}</div>
           ${q.status === 'done' ? `
-            <input style="flex:1;min-width:90px;max-width:110px" class="form-input" type="date" value="${escHtml(date)}" onchange="ocrQueueEdit(${idx},'date',this.value)">
+            <roc-date style="flex:1;min-width:120px;max-width:150px" data-input-class="form-input" data-init="${escHtml(date)}" onchange="ocrQueueEdit(${idx},'date',this.value)"></roc-date>
             <input style="flex:2;min-width:120px" class="form-input" placeholder="標題" value="${escHtml(title)}" onchange="ocrQueueEdit(${idx},'title',this.value)">
             <input style="flex:1;min-width:80px;max-width:100px" class="form-input" type="number" placeholder="金額" value="${escHtml(String(amt))}" onchange="ocrQueueEdit(${idx},'amount',parseFloat(this.value)||0)">
             <select style="flex:1;min-width:80px;max-width:100px" class="form-input" onchange="ocrQueueEdit(${idx},'type',this.value);this.closest('div').querySelector('select:last-of-type').innerHTML=_catOptsHtml(this.value,null)">
@@ -8202,6 +8202,8 @@ function renderOcrQueue() {
           <button class="btn btn-danger btn-sm" onclick="removeFromOcrQueue(${idx})" style="flex:0 0 auto;padding:4px 8px">✕</button>
         </div>`;
       }).join('');
+  // OCR 佇列的民國日期格：以 ISO 值回填
+  document.querySelectorAll('#ocr-queue-list roc-date[data-init]').forEach(el => { el.value = el.dataset.init; });
 }
 
 function ocrQueueEdit(idx, field, value) {

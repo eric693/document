@@ -15,6 +15,40 @@ from db import get_db
 
 bp = Blueprint('exports', __name__)
 
+import re as _re
+
+
+def _roc_cell(v):
+    """報表儲存格：日期/日期時間值→民國年顯示（115/07/21）；數字、None、
+    其他字串原樣回傳（保留 Excel 數字格式）。純顯示用，不影響 EDI/查詢。"""
+    if isinstance(v, _dt):
+        s = f'{v.year - 1911}/{v.month:02d}/{v.day:02d}'
+        if v.hour or v.minute:
+            s += v.strftime(' %H:%M')
+        return s
+    if isinstance(v, _date):
+        return f'{v.year - 1911}/{v.month:02d}/{v.day:02d}'
+    if isinstance(v, str):
+        m = _re.match(r'^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}:\d{2})(?::\d{2})?)?$', v)
+        if m:
+            s = f'{int(m.group(1)) - 1911}/{m.group(2)}/{m.group(3)}'
+            if m.group(4):
+                s += ' ' + m.group(4)
+            return s
+    return v
+
+
+def _roc_period(s):
+    """標題用期間標籤：2026-07→民國115年07月、2026→民國115年、其他原樣。"""
+    s = str(s)
+    m = _re.match(r'^(\d{4})-(\d{2})$', s)
+    if m:
+        return f'民國{int(m.group(1)) - 1911}年{m.group(2)}月'
+    m = _re.match(r'^(\d{4})$', s)
+    if m:
+        return f'民國{int(m.group(1)) - 1911}年'
+    return s
+
 # ── PDF 輔助函式 ───────────────────────────────────────────────────
 
 def _register_zh_font():
@@ -56,7 +90,7 @@ def _build_pdf(title, subtitle, headers, col_widths, rows, landscape=False):
     scale   = page_w / total_w if total_w > page_w else 1.0
     scaled  = [w * scale for w in col_widths]
 
-    table_data = [headers] + [[str(v) if v is not None else '' for v in r] for r in rows]
+    table_data = [headers] + [['' if v is None else str(_roc_cell(v)) for v in r] for r in rows]
     t = Table(table_data, colWidths=scaled, repeatRows=1)
     HDR_BG = colors.HexColor('#0F1C3A')
     ROW_BG = colors.HexColor('#F4F6FA')
@@ -123,6 +157,7 @@ def _xl_write_rows(ws, data_rows, num_cols, number_cols=None):
     for ri, row_vals in enumerate(data_rows, 2):
         fill = even_fill if ri % 2 == 0 else None
         for ci, v in enumerate(row_vals, 1):
+            v = _roc_cell(v)
             cell = ws.cell(row=ri, column=ci, value=v)
             if fill: cell.fill = fill
             cell.border = thin
@@ -202,7 +237,7 @@ def api_export_attendance():
             WHERE {' AND '.join(conds)} ORDER BY ps.name, pr.punched_at
         """, params).fetchall()
     PUNCH_LABEL = {'in': '上班打卡', 'out': '下班打卡', 'break_out': '休息開始', 'break_in': '休息結束'}
-    wb, ws = _xl_workbook(f'{month} 出勤明細')
+    wb, ws = _xl_workbook(f'{_roc_period(month)} 出勤明細')
     headers = ['員工代碼', '姓名', '案場', '職稱', '日期', '打卡類型', '時間', '補打卡', 'GPS距離(m)', '地點', '備註']
     widths  = [10, 10, 12, 12, 12, 10, 8, 7, 11, 14, 20]
     _xl_write_header(ws, headers, widths)
@@ -236,7 +271,7 @@ def api_export_attendance_summary():
                      (pr.punched_at AT TIME ZONE 'Asia/Taipei')::date
             ORDER BY ps.name, (pr.punched_at AT TIME ZONE 'Asia/Taipei')::date
         """, (month,)).fetchall()
-    wb, ws = _xl_workbook(f'{month} 出勤摘要')
+    wb, ws = _xl_workbook(f'{_roc_period(month)} 出勤摘要')
     headers = ['員工代碼', '姓名', '案場', '職稱', '日期', '上班', '下班', '工時(h)', '打卡次數', '含補打']
     widths  = [10, 10, 12, 12, 12, 8, 8, 9, 9, 7]
     _xl_write_header(ws, headers, widths)
@@ -362,7 +397,7 @@ def api_anomaly_report_excel():
         })
     anomalies.sort(key=lambda x: (x['date'], x['staff_name']))
 
-    wb = openpyxl.Workbook(); ws = wb.active; ws.title = f'{month} 異常明細'
+    wb = openpyxl.Workbook(); ws = wb.active; ws.title = f'{_roc_period(month)} 異常明細'
     thin = Border(left=Side(style='thin', color='DDDDDD'), right=Side(style='thin', color='DDDDDD'),
                   top=Side(style='thin', color='DDDDDD'), bottom=Side(style='thin', color='DDDDDD'))
     header_fill = PatternFill('solid', fgColor='0F1C3A')
@@ -381,6 +416,7 @@ def api_anomaly_report_excel():
         for ci, v in enumerate([a['staff_name'], a['department'], a['date'],
                                   a['shift_start'], a['shift_end'], a['clock_in'], a['clock_out'],
                                   a['anomaly_type'], a['detail']], 1):
+            v = _roc_cell(v)
             cell = ws.cell(row=ri, column=ci, value=v)
             cell.fill = row_fill; cell.border = thin
             cell.alignment = center_align if ci != 9 else Alignment(vertical='center')
@@ -415,7 +451,7 @@ def api_export_salary():
             WHERE lr.status='approved' AND to_char(lr.start_date,'YYYY-MM')=%s GROUP BY lr.staff_id
         """, (month,)).fetchall()
     leave_map = {r['staff_id']: r for r in leave_detail}
-    wb, ws = _xl_workbook(f'{month} 薪資明細')
+    wb, ws = _xl_workbook(f'{_roc_period(month)} 薪資明細')
     headers = ['員工代碼', '姓名', '案場', '職稱', '薪資制度',
                '工作日', '出勤天數', '請假天數', '無薪假天數', '事假天數', '病假天數',
                '津貼合計', '扣除合計', '加班費', '實領金額', '狀態', '備註']
@@ -587,7 +623,7 @@ def api_export_leave_balance():
             JOIN leave_types lt ON lt.id = lb.leave_type_id
             WHERE lb.year = %s ORDER BY ps.department, ps.name, lt.sort_order
         """, (int(year),)).fetchall()
-    wb, ws = _xl_workbook(f'{year} 請假餘額')
+    wb, ws = _xl_workbook(f'{_roc_period(year)} 請假餘額')
     headers = ['員工代碼', '姓名', '案場', '假別', '假別代碼', '年度上限(天)', '已核准(天)', '剩餘(天)']
     widths  = [10, 10, 12, 12, 8, 11, 11, 10]
     _xl_write_header(ws, headers, widths)
@@ -640,7 +676,7 @@ def api_export_withholding():
     if fmt == 'xlsx':
         import openpyxl
         from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-        wb = openpyxl.Workbook(); ws = wb.active; ws.title = f'{year}年扣繳憑單'
+        wb = openpyxl.Workbook(); ws = wb.active; ws.title = f'{_roc_period(year)}扣繳憑單'
         hfill = PatternFill('solid', fgColor='0F1C3A')
         thin  = Border(*[Side(style='thin', color='DDDDDD')]*4)
         hdrs  = ['序號', '姓名', '身分證字號', '地址', '年度薪資合計', '二代健保補充費', '扣繳稅額']
@@ -668,7 +704,7 @@ def api_export_withholding():
         <td style="text-align:right;font-family:monospace">{d['supp_nhi']:,.0f}</td>
         <td style="text-align:right;font-family:monospace">{d['tax']:,.0f}</td></tr>""" for d in data)
     html = f"""<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8">
-<title>{year}年度薪資扣繳憑單</title>
+<title>{_roc_period(year)}度薪資扣繳憑單</title>
 <style>body{{font-family:'Noto Sans TC',sans-serif;font-size:12px;padding:20px;color:#1e2a45}}
 h2{{font-size:16px;font-weight:700;margin-bottom:4px}}
 .meta{{font-size:11px;color:#666;margin-bottom:16px}}
@@ -678,8 +714,8 @@ td{{padding:6px 10px;border-bottom:1px solid #eee;font-size:12px}}
 tr:nth-child(even){{background:#f8f9fb}}
 @media print{{button{{display:none}}}}</style></head><body>
 <button onclick="window.print()" style="margin-bottom:16px;padding:6px 16px;background:#0f1c3a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">列印</button>
-<h2>{year} 年度薪資所得扣繳憑單（所得類別 50）</h2>
-<div class="meta">扣繳義務人：{company_name}　統一編號：{company_tax_id}　地址：{company_address}　製表日期：{_tw_today().isoformat()}</div>
+<h2>{_roc_period(year)}度薪資所得扣繳憑單（所得類別 50）</h2>
+<div class="meta">扣繳義務人：{company_name}　統一編號：{company_tax_id}　地址：{company_address}　製表日期：{_roc_cell(_tw_today())}</div>
 <table><thead><tr><th>#</th><th>員工姓名</th><th>身分證字號</th><th>地址</th>
 <th>年度薪資合計(元)</th><th>二代健保補充費(元)</th><th>扣繳稅額(元)</th></tr></thead>
 <tbody>{rows_html}</tbody></table></body></html>"""
@@ -713,7 +749,7 @@ def api_export_attendance_pdf():
              str(r['work_date']), PUNCH_LABEL.get(r['punch_type'], r['punch_type']),
              r['punch_time'], '是' if r['is_manual'] else '', r['location_name'] or '']
             for r in rows]
-    buf = _build_pdf(f'{month} 出勤打卡明細', f'製表：{_tw_today().isoformat()}  共 {len(data)} 筆',
+    buf = _build_pdf(f'{_roc_period(month)} 出勤打卡明細', f'製表：{_roc_cell(_tw_today())}  共 {len(data)} 筆',
                      headers, col_widths, data, landscape=True)
     return _pdf_response(buf, f'attendance_{month}.pdf')
 
@@ -752,7 +788,7 @@ def api_export_attendance_summary_pdf():
         data.append([r['employee_code'] or '', r['name'], r['department'] or '',
                      str(r['work_date']), r['clock_in'] or '', r['clock_out'] or '',
                      dur_h, str(r['punch_count']), '是' if r['has_manual'] else ''])
-    buf = _build_pdf(f'{month} 出勤摘要', f'製表：{_tw_today().isoformat()}  共 {len(data)} 筆',
+    buf = _build_pdf(f'{_roc_period(month)} 出勤摘要', f'製表：{_roc_cell(_tw_today())}  共 {len(data)} 筆',
                      headers, col_widths, data, landscape=True)
     return _pdf_response(buf, f'attendance_summary_{month}.pdf')
 
@@ -851,7 +887,7 @@ def api_anomaly_report_pdf():
     anomalies.sort(key=lambda x: (x[2], x[0]))
     headers    = ['姓名', '案場', '日期', '應上班', '應下班', '實際上班', '實際下班', '異常類型', '說明']
     col_widths = [55, 55, 65, 45, 45, 50, 50, 55, 120]
-    buf = _build_pdf(f'{month} 出勤異常報告', f'製表：{_tw_today().isoformat()}  共 {len(anomalies)} 筆',
+    buf = _build_pdf(f'{_roc_period(month)} 出勤異常報告', f'製表：{_roc_cell(_tw_today())}  共 {len(anomalies)} 筆',
                      headers, col_widths, anomalies, landscape=True)
     return _pdf_response(buf, f'anomaly_{month}.pdf')
 
@@ -878,7 +914,7 @@ def api_export_salary_pdf():
              f"{float(r['net_pay'] or 0):,.0f}",
              '已確認' if r['status'] == 'confirmed' else '草稿']
             for r in rows]
-    buf = _build_pdf(f'{month} 薪資明細', f'製表：{_tw_today().isoformat()}  共 {len(data)} 人',
+    buf = _build_pdf(f'{_roc_period(month)} 薪資明細', f'製表：{_roc_cell(_tw_today())}  共 {len(data)} 人',
                      headers, col_widths, data, landscape=True)
     return _pdf_response(buf, f'salary_{month}.pdf')
 
@@ -912,7 +948,7 @@ def api_export_leave_pdf():
              STATUS_LABEL.get(r['status'], r['status'])]
             for r in rows]
     label = month or year or 'all'
-    buf = _build_pdf(f'{label} 請假記錄', f'製表：{_tw_today().isoformat()}  共 {len(data)} 筆',
+    buf = _build_pdf(f'{_roc_period(label)} 請假記錄', f'製表：{_roc_cell(_tw_today())}  共 {len(data)} 筆',
                      headers, col_widths, data, landscape=True)
     return _pdf_response(buf, f'leave_{label}.pdf')
 
@@ -938,7 +974,7 @@ def api_export_leave_balance_pdf():
              str(round(float(r['max_days'] or 0) - float(r['used_days'] or 0), 2))
              if r['max_days'] is not None else '']
             for r in rows]
-    buf = _build_pdf(f'{year} 年假別餘額', f'製表：{_tw_today().isoformat()}  共 {len(data)} 筆',
+    buf = _build_pdf(f'{_roc_period(year)} 假別餘額', f'製表：{_roc_cell(_tw_today())}  共 {len(data)} 筆',
                      headers, col_widths, data)
     return _pdf_response(buf, f'leave_balance_{year}.pdf')
 
@@ -968,7 +1004,7 @@ def api_export_overtime_pdf():
              STATUS_LABEL.get(r['status'], r['status'])]
             for r in rows]
     label = month or 'all'
-    buf = _build_pdf(f'{label} 加班記錄', f'製表：{_tw_today().isoformat()}  共 {len(data)} 筆',
+    buf = _build_pdf(f'{_roc_period(label)} 加班記錄', f'製表：{_roc_cell(_tw_today())}  共 {len(data)} 筆',
                      headers, col_widths, data, landscape=True)
     return _pdf_response(buf, f'overtime_{label}.pdf')
 
@@ -995,7 +1031,7 @@ def api_export_staff_pdf():
              str(r['hire_date']) if r['hire_date'] else '',
              '在職' if r['active'] else '離職']
             for r in rows]
-    buf = _build_pdf('員工資料表', f'製表：{_tw_today().isoformat()}  共 {len(data)} 人',
+    buf = _build_pdf('員工資料表', f'製表：{_roc_cell(_tw_today())}  共 {len(data)} 人',
                      headers, col_widths, data, landscape=True)
     return _pdf_response(buf, 'staff_list.pdf')
 
@@ -1032,7 +1068,7 @@ def api_export_training_pdf():
                      str(r['completed_date']) if r['completed_date'] else '',
                      str(r['expiry_date']) if r['expiry_date'] else '',
                      days_left, status])
-    buf = _build_pdf('訓練記錄', f'製表：{_tw_today().isoformat()}  共 {len(data)} 筆',
+    buf = _build_pdf('訓練記錄', f'製表：{_roc_cell(_tw_today())}  共 {len(data)} 筆',
                      headers, col_widths, data, landscape=True)
     return _pdf_response(buf, 'training_records.pdf')
 
@@ -1061,7 +1097,7 @@ def api_export_expense_pdf():
              r['note'] or '', STATUS_LABEL.get(r['status'], r['status'])]
             for r in rows]
     label = month or 'all'
-    buf = _build_pdf(f'{label} 費用報帳', f'製表：{_tw_today().isoformat()}  共 {len(data)} 筆',
+    buf = _build_pdf(f'{_roc_period(label)} 費用報帳', f'製表：{_roc_cell(_tw_today())}  共 {len(data)} 筆',
                      headers, col_widths, data, landscape=True)
     return _pdf_response(buf, f'expense_{label}.pdf')
 
@@ -1093,8 +1129,8 @@ def api_export_withholding_pdf():
              f"{supp_nhi(r['gross_salary'], r['avg_insured']):,.0f}",
              f"{float(r['tax_withheld']):,.0f}"]
             for i, r in enumerate(rows, 1)]
-    subtitle = f"扣繳義務人：{company_name}　製表：{_tw_today().isoformat()}  共 {len(data)} 人"
-    buf = _build_pdf(f'{year} 年度薪資所得扣繳憑單（所得類別50）', subtitle,
+    subtitle = f"扣繳義務人：{company_name}　製表：{_roc_cell(_tw_today())}  共 {len(data)} 人"
+    buf = _build_pdf(f'{_roc_period(year)}度薪資所得扣繳憑單（所得類別50）', subtitle,
                      headers, col_widths, data)
     return _pdf_response(buf, f'withholding_{year}.pdf')
 
@@ -1218,7 +1254,7 @@ def api_export_announcements():
 def api_export_announcements_pdf():
     rows = _ann_rows(request.args.get('category', ''))
     col_widths = [150, 45, 40, 32, 50, 90, 65, 55, 45, 45]
-    buf = _build_pdf('公告清單', f'製表：{_tw_today().isoformat()}  共 {len(rows)} 筆',
+    buf = _build_pdf('公告清單', f'製表：{_roc_cell(_tw_today())}  共 {len(rows)} 筆',
                      _ANN_HEADERS, col_widths, _ann_data(rows), landscape=True)
     return _pdf_response(buf, 'announcements.pdf')
 
@@ -1262,7 +1298,7 @@ def api_export_labor_law():
 def api_export_labor_law_pdf():
     rows = _labor_rows()
     col_widths = [70, 260, 55, 95, 220]
-    buf = _build_pdf('勞動基準法異動監控', f'製表：{_tw_today().isoformat()}  共 {len(rows)} 筆',
+    buf = _build_pdf('勞動基準法異動監控', f'製表：{_roc_cell(_tw_today())}  共 {len(rows)} 筆',
                      _LABOR_HEADERS, col_widths, _labor_data(rows), landscape=True)
     return _pdf_response(buf, 'labor_law_updates.pdf')
 
@@ -1326,6 +1362,6 @@ def api_export_documents_pdf():
             line.append('✓' if st == 'received' else ('免' if st == 'na' else '✗'))
         line.append(str(s['missing_count']) if s['missing_count'] else '')
         data.append(line)
-    subtitle = f'製表：{_tw_today().isoformat()}  共 {len(data)} 位員工　文件項目 {len(types)} 項'
+    subtitle = f'製表：{_roc_cell(_tw_today())}  共 {len(data)} 位員工　文件項目 {len(types)} 項'
     buf = _build_pdf('員工文件收件狀態', subtitle, headers, col_widths, data, landscape=True)
     return _pdf_response(buf, 'documents_matrix.pdf')
