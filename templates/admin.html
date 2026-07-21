@@ -478,9 +478,9 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         <select class="filter-input" id="rec-filter-staff" onchange="loadPunchRecords()" style="min-width:120px"><option value="">全部</option></select>
         <div class="filter-divider"></div>
         <span class="filter-label">日期</span>
-        <input class="filter-input" type="date" id="rec-filter-from" onchange="loadPunchRecords()">
+        <roc-date id="rec-filter-from" onchange="loadPunchRecords()" data-input-class="filter-input"></roc-date>
         <span class="filter-sep">—</span>
-        <input class="filter-input" type="date" id="rec-filter-to" onchange="loadPunchRecords()">
+        <roc-date id="rec-filter-to" onchange="loadPunchRecords()" data-input-class="filter-input"></roc-date>
         <div class="filter-divider"></div>
         <span class="filter-label">月份</span>
         <input class="filter-input" type="month" id="rec-filter-month" onchange="recMonthChange()">
@@ -1246,7 +1246,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
               <select id="edi-staff-sel" class="form-input" multiple style="width:100%;height:100px"></select>
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-              <div><label class="form-label">事件日期</label><input type="date" id="edi-event-date" class="form-input" style="width:100%"></div>
+              <div><label class="form-label">事件日期</label><roc-date id="edi-event-date" style="width:100%" data-input-class="form-input"></roc-date></div>
               <div><label class="form-label">薪資調整月份</label><input type="month" id="edi-salary-month" class="form-input" style="width:100%"></div>
             </div>
           </div>
@@ -1982,9 +1982,9 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         <option value="1">已公告</option>
         <option value="0">待公告</option>
       </select>
-      <input class="filter-input" type="date" id="ll-filter-from" onchange="renderLaborLawTable()" title="修正日期起">
+      <roc-date id="ll-filter-from" onchange="renderLaborLawTable()" title="修正日期起" data-input-class="filter-input"></roc-date>
       <span style="font-size:12px;color:var(--muted)">～</span>
-      <input class="filter-input" type="date" id="ll-filter-to" onchange="renderLaborLawTable()" title="修正日期迄">
+      <roc-date id="ll-filter-to" onchange="renderLaborLawTable()" title="修正日期迄" data-input-class="filter-input"></roc-date>
       <span id="ll-filter-count" style="font-size:12px;color:var(--muted)"></span>
       <span style="flex:1"></span>
       <button class="btn btn-outline btn-sm" onclick="window.open('/api/export/labor-law','_blank')">匯出 Excel</button>
@@ -2264,8 +2264,8 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <div class="fm-section">
         <div class="fm-sec-head"><span class="dot"></span><span class="t">效期與證書</span><span class="line"></span></div>
         <div class="form-grid">
-          <div class="form-group"><label class="form-label">完成日期</label><input type="date" class="form-input" id="tm-completed"></div>
-          <div class="form-group"><label class="form-label">到期日期</label><input type="date" class="form-input" id="tm-expiry"></div>
+          <div class="form-group"><label class="form-label">完成日期</label><roc-date id="tm-completed" data-input-class="form-input"></roc-date></div>
+          <div class="form-group"><label class="form-label">到期日期</label><roc-date id="tm-expiry" data-input-class="form-input"></roc-date></div>
           <div class="form-group"><label class="form-label">證書號碼</label><input class="form-input" id="tm-cert" placeholder="選填"></div>
           <div class="form-group"><label class="form-label">備註</label><input class="form-input" id="tm-note" placeholder="選填"></div>
         </div>
@@ -2299,8 +2299,8 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
               <option value="na">免附（不適用）</option>
             </select>
           </div>
-          <div class="form-group"><label class="form-label">收件日期</label><input type="date" class="form-input" id="dcm-date"></div>
-          <div class="form-group"><label class="form-label">到期日（選填）</label><input type="date" class="form-input" id="dcm-expiry"><div class="fm-note">體檢表等有效期文件，到期前 30 天矩陣會顯示警示</div></div>
+          <div class="form-group"><label class="form-label">收件日期</label><roc-date id="dcm-date" data-input-class="form-input"></roc-date></div>
+          <div class="form-group"><label class="form-label">到期日（選填）</label><roc-date id="dcm-expiry" data-input-class="form-input"></roc-date><div class="fm-note">體檢表等有效期文件，到期前 30 天矩陣會顯示警示</div></div>
           <div class="form-group full-width"><label class="form-label">內容／文件資料</label><input class="form-input" id="dcm-content" placeholder="例：電話號碼、帳號、文件字號（選填）"></div>
           <div class="form-group full-width"><label class="form-label">備註</label><input class="form-input" id="dcm-note" placeholder="選填"></div>
         </div>
@@ -2401,7 +2401,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
           <div class="form-group"><label class="form-label">員工編號</label><input class="form-input" id="psm-code" placeholder="例：EMP001"></div>
           <div class="form-group"><label class="form-label">姓名 *</label><input class="form-input" id="psm-name" placeholder="員工姓名" style="font-family:'Noto Sans TC',sans-serif" oninput="if(!document.getElementById('psm-account-holder').value)document.getElementById('psm-account-holder').value=this.value"></div>
           <div class="form-group"><label class="form-label">身分證字號（ID）</label><input class="form-input" id="psm-national-id" placeholder="例：A123456789" autocapitalize="characters"></div>
-          <div class="form-group"><label class="form-label">生日</label><input class="form-input" type="date" id="psm-birth-date"></div>
+          <div class="form-group"><label class="form-label">生日</label><roc-date id="psm-birth-date" data-input-class="form-input"></roc-date></div>
           <div class="form-group"><label class="form-label">電話</label><input class="form-input" id="psm-phone" placeholder="例：0912345678" inputmode="tel"></div>
           <div class="form-group" data-cf-slot="住家電話" style="display:none"></div>
           <div class="form-group full-width"><label class="form-label">緊急聯絡人</label><input class="form-input" id="psm-emergency" placeholder="例：王大明 0987654321（姓名＋電話）" style="font-family:'Noto Sans TC',sans-serif"></div>
@@ -2412,7 +2412,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
           <div class="form-group"><label class="form-label">前科</label><select class="form-input" id="psm-criminal"><option value="">未填</option><option value="無">無</option><option value="有">有</option></select></div>
           <div class="form-group" data-cf-slot="安檢日期" style="display:none"></div>
           <div class="form-group" data-cf-slot="84-1核備" style="display:none"></div>
-          <div class="form-group"><label class="form-label">到職日</label><input class="form-input" type="date" id="psm-hire-date"></div>
+          <div class="form-group"><label class="form-label">到職日</label><roc-date id="psm-hire-date" data-input-class="form-input"></roc-date></div>
           <div class="form-group"><label class="form-label">在職狀態</label><select class="form-input" id="psm-active"><option value="1">在職</option><option value="0">停用</option></select></div>
         </div>
       </div>
@@ -2688,7 +2688,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     </div>
     <div class="modal-body">
       <input type="hidden" id="hm-id">
-      <div style="margin-bottom:12px"><label class="form-label">日期 *</label><input class="form-input" type="date" id="hm-date" style="width:100%"></div>
+      <div style="margin-bottom:12px"><label class="form-label">日期 *</label><roc-date id="hm-date" style="width:100%" data-input-class="form-input"></roc-date></div>
       <div style="margin-bottom:12px"><label class="form-label">名稱 *</label><input class="form-input" id="hm-name" placeholder="例：國慶日" style="width:100%"></div>
       <div style="margin-bottom:12px">
         <label class="form-label">類型</label>
@@ -2780,8 +2780,8 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <div class="fm-section">
         <div class="fm-sec-head"><span class="dot"></span><span class="t">請假期間</span><span class="line"></span></div>
         <div class="form-grid">
-          <div class="form-group"><label class="form-label">開始日期 *</label><input class="form-input" type="date" id="lam-start"></div>
-          <div class="form-group"><label class="form-label">結束日期 *</label><input class="form-input" type="date" id="lam-end"></div>
+          <div class="form-group"><label class="form-label">開始日期 *</label><roc-date id="lam-start" data-input-class="form-input"></roc-date></div>
+          <div class="form-group"><label class="form-label">結束日期 *</label><roc-date id="lam-end" data-input-class="form-input"></roc-date></div>
           <div class="form-group full-width" style="flex-direction:row;gap:12px">
             <label class="fm-check"><input type="checkbox" id="lam-start-half"> 開始日半天</label>
             <label class="fm-check"><input type="checkbox" id="lam-end-half"> 結束日半天</label>
@@ -2891,7 +2891,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         <div class="form-group"><label class="form-label">員工代碼</label><input class="form-input" id="ssm-code" placeholder="例：EMP001"></div>
         <div class="form-group"><label class="form-label">案場</label><input class="form-input" id="ssm-dept" placeholder="例：外場"></div>
         <div class="form-group"><label class="form-label">職稱</label><input class="form-input" id="ssm-pos" placeholder="例：領班"></div>
-        <div class="form-group"><label class="form-label">到職日</label><input class="form-input" type="date" id="ssm-hire"></div>
+        <div class="form-group"><label class="form-label">到職日</label><roc-date id="ssm-hire" data-input-class="form-input"></roc-date></div>
         <div class="form-group"><label class="form-label">薪資制度</label><select class="form-input" id="ssm-sal-type" onchange="toggleSalType()"><option value="monthly">月薪制</option><option value="hourly">時薪制</option></select></div>
         <div class="form-group" id="ssm-base-wrap"><label class="form-label">底薪（月薪）</label><input class="form-input" type="number" id="ssm-base" placeholder="例：28590"></div>
         <div class="form-group" id="ssm-hourly-wrap" style="display:none"><label class="form-label">時薪</label><input class="form-input" type="number" id="ssm-hourly" placeholder="例：183"></div>
@@ -2990,7 +2990,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <div class="fm-section">
         <div class="fm-sec-head"><span class="dot"></span><span class="t">收支內容</span><span class="line"></span></div>
         <div class="form-grid">
-          <div class="form-group"><label class="form-label">日期 *</label><input class="form-input" type="date" id="frm-date"></div>
+          <div class="form-group"><label class="form-label">日期 *</label><roc-date id="frm-date" data-input-class="form-input"></roc-date></div>
           <div class="form-group"><label class="form-label">類型</label>
             <select class="form-input" id="frm-type" onchange="renderFinCatOptions()">
               <option value="income">收入</option><option value="expense">支出</option>
@@ -3081,7 +3081,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <div class="form-row">
         <div>
           <label class="form-label">日期 *</label>
-          <input class="form-input" type="date" id="oem-date">
+          <roc-date id="oem-date" data-input-class="form-input"></roc-date>
         </div>
         <div>
           <label class="form-label">含稅金額 *</label>
@@ -3175,8 +3175,8 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <div class="fm-section">
         <div class="fm-sec-head"><span class="dot"></span><span class="t">期限與結清</span><span class="line"></span></div>
         <div class="form-grid">
-          <div class="form-group"><label class="form-label">到期日</label><input class="form-input" id="apm-due" type="date"></div>
-          <div class="form-group" id="apm-paid-date-wrap"><label class="form-label">結清日期</label><input class="form-input" id="apm-paid" type="date"></div>
+          <div class="form-group"><label class="form-label">到期日</label><roc-date id="apm-due" data-input-class="form-input"></roc-date></div>
+          <div class="form-group" id="apm-paid-date-wrap"><label class="form-label">結清日期</label><roc-date id="apm-paid" data-input-class="form-input"></roc-date></div>
           <div class="form-group full-width"><label class="form-label">備註</label><input class="form-input" id="apm-note" placeholder="選填" style="font-family:'Noto Sans TC',sans-serif"></div>
         </div>
       </div>
@@ -3241,8 +3241,8 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
             </select>
           </div>
           <div class="form-group"><label class="form-label">每次產生日（幾號）</label><input class="form-input" id="rm-day" type="number" min="1" max="28" value="1"></div>
-          <div class="form-group"><label class="form-label">開始日期 *</label><input class="form-input" id="rm-start" type="date"></div>
-          <div class="form-group"><label class="form-label">結束日期（選填）</label><input class="form-input" id="rm-end" type="date"></div>
+          <div class="form-group"><label class="form-label">開始日期 *</label><roc-date id="rm-start" data-input-class="form-input"></roc-date></div>
+          <div class="form-group"><label class="form-label">結束日期（選填）</label><roc-date id="rm-end" data-input-class="form-input"></roc-date></div>
           <div class="form-group full-width"><label class="form-label">備註</label><input class="form-input" id="rm-note" placeholder="選填" style="font-family:'Noto Sans TC',sans-serif"></div>
         </div>
       </div>
@@ -3324,6 +3324,65 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
 <div class="toast-wrap" id="toast-wrap"></div>
 
 <script>
+// ── 民國日期共用工具 ──────────────────────────────────────────
+// 系統內部一律用西元 ISO (YYYY-MM-DD)；顯示與輸入用民國年。
+function isoToRoc(iso) {
+  if (!iso) return '';
+  const m = String(iso).slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return '';
+  const y = parseInt(m[1], 10) - 1911;
+  return `${y}/${m[2]}/${m[3]}`;
+}
+function rocToIso(str) {
+  if (!str) return '';
+  const parts = String(str).trim().split(/[\/\-.]/);
+  if (parts.length !== 3) return '';
+  let [y, mo, d] = parts.map(x => parseInt(x, 10));
+  if ([y, mo, d].some(isNaN)) return '';
+  if (y < 1911) y += 1911;               // 民國 → 西元
+  if (mo < 1 || mo > 12 || d < 1 || d > 31) return '';
+  return `${String(y).padStart(4, '0')}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+// 唯讀顯示：純 ISO 日期→民國字串；含時間或非日期值原樣回傳（避免吃掉時間）
+function rocDate(v) { if (v == null) return ''; const s = String(v); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? isoToRoc(s) : s; }
+
+// ── 民國日期輸入元件 <roc-date> ───────────────────────────────
+// 對外 .value 仍是 ISO，故所有既有 JS（getElementById(x).value）皆無需更動。
+class RocDateInput extends HTMLElement {
+  connectedCallback() {
+    if (this._built) return; this._built = true;
+    const cls = this.getAttribute('data-input-class') || 'form-input';
+    this.style.display = 'block';
+    this.innerHTML =
+      `<span style="display:flex;align-items:center;gap:4px">` +
+      `<input type="text" inputmode="numeric" class="${cls}" placeholder="民國 例 115/07/21" style="flex:1;font-family:'DM Mono',monospace">` +
+      `<input type="date" tabindex="-1" title="日曆選取" style="width:32px;flex:none;padding:2px;opacity:.6;cursor:pointer">` +
+      `</span>`;
+    this._text = this.querySelector('input[type=text]');
+    this._pick = this.querySelector('input[type=date]');
+    const stop = e => e.stopPropagation();
+    this._text.addEventListener('change', e => { stop(e); this._fromText(); });
+    this._text.addEventListener('blur', () => this._fromText());
+    this._pick.addEventListener('change', e => { stop(e); this._setIso(this._pick.value, true); });
+    if (this._pending != null) { this._setIso(this._pending, false); this._pending = null; }
+  }
+  _fromText() {
+    if (this._text.value.trim() === '') { this._setIso('', true); return; }
+    const iso = rocToIso(this._text.value);
+    if (!iso) { this._text.style.borderColor = 'var(--red, #e11d48)'; return; }
+    this._setIso(iso, true);
+  }
+  _setIso(iso, fire) {
+    this._iso = iso || '';
+    if (this._text) { this._text.value = isoToRoc(this._iso); this._text.style.borderColor = ''; }
+    if (this._pick) this._pick.value = this._iso;
+    if (fire) this.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  get value() { return this._iso || ''; }
+  set value(v) { if (!this._built) { this._pending = v; return; } this._setIso(v || '', false); }
+}
+customElements.define('roc-date', RocDateInput);
+
 // ── 管理員身份 & 權限 ─────────────────────────────────────────
 const ADMIN_DISPLAY_NAME = {{ admin_display_name | tojson }};
 const ADMIN_PERMS        = {{ admin_permissions  | tojson }};
@@ -3526,7 +3585,7 @@ function openTerminateModal(staffId, staffName) {
       <div class="modal-body">
         <div style="margin-bottom:12px">
           <label class="form-label">離職日期 *</label>
-          <input class="form-input" type="date" id="tm-date" style="width:100%">
+          <roc-date id="tm-date" style="width:100%" data-input-class="form-input"></roc-date>
         </div>
         <div style="margin-bottom:12px">
           <label class="form-label">離職原因</label>
@@ -4441,7 +4500,7 @@ async function loadPunchSummary() {
       dur = h > 0 ? `${h}h ${m}m` : `${m}m`;
     }
     return `<tr>
-      <td style="font-family:'DM Mono',monospace;font-size:12px;white-space:nowrap">${r.work_date||''}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px;white-space:nowrap">${rocDate(r.work_date)||''}</td>
       <td style="font-weight:600">${escHtml(r.staff_name)}</td>
       <td style="font-family:'DM Mono',monospace;color:var(--green)">${ci}</td>
       <td style="font-family:'DM Mono',monospace;color:var(--red)">${co}</td>
@@ -4691,10 +4750,15 @@ function openPunchStaffModal(id=null) {
   const cfVals = (s && s.custom_fields) || {};
   const leftovers = [];
   activeDefs.forEach(f => {
-    const t = f.field_type === 'number' ? 'number' : (f.field_type === 'date' ? 'date' : 'text');
     const v = cfVals[f.name] != null ? String(cfVals[f.name]) : '';
-    const inner = `<label class="form-label">${escHtml(f.name)}</label>
-      <input class="form-input psm-cf" data-cf-name="${escHtml(f.name)}" type="${t}" value="${escHtml(v)}"${t==='text' ? ` style="font-family:'Noto Sans TC',sans-serif"` : ''}>`;
+    let field;
+    if (f.field_type === 'date') {
+      field = `<roc-date class="psm-cf" data-cf-name="${escHtml(f.name)}"></roc-date>`;
+    } else {
+      const t = f.field_type === 'number' ? 'number' : 'text';
+      field = `<input class="form-input psm-cf" data-cf-name="${escHtml(f.name)}" type="${t}" value="${escHtml(v)}"${t === 'text' ? ` style="font-family:'Noto Sans TC',sans-serif"` : ''}>`;
+    }
+    const inner = `<label class="form-label">${escHtml(f.name)}</label>\n      ${field}`;
     const slot = document.querySelector(`#punch-staff-modal [data-cf-slot="${CSS.escape(f.name)}"]`);
     if (slot) { slot.innerHTML = inner; slot.style.display = ''; }
     else leftovers.push(`<div class="form-group">${inner}</div>`);
@@ -4705,6 +4769,10 @@ function openPunchStaffModal(id=null) {
   } else {
     cfGrid.innerHTML = ''; cfSec.style.display = 'none';
   }
+  // 日期型自訂欄位（roc-date）以 ISO 值回填
+  document.querySelectorAll('#punch-staff-modal roc-date.psm-cf').forEach(el => {
+    el.value = cfVals[el.dataset.cfName] || '';
+  });
   // 文件收件勾選
   const docWrap = document.getElementById('psm-docs-list');
   if (punchDocItems.length) {
@@ -5219,7 +5287,7 @@ function renderOTRequests() {
       <div class="card-header" style="flex-wrap:wrap;gap:8px">
         <div style="display:flex;align-items:flex-start;gap:10px">
           ${isOTPending?`<input type="checkbox" class="batch-cb" data-cat="ot" data-id="${r.id}" style="margin-top:2px" onchange="toggleBatchItem('ot',${r.id},this.checked)">`:``}
-          <div><span class="card-title">${escHtml(r.staff_name||'')}</span>${r.staff_role?`<span style="font-size:12px;color:var(--muted);margin-left:8px">${escHtml(r.staff_role)}</span>`:''}<div style="font-size:12px;color:var(--muted);margin-top:3px">${r.request_date}　${r.start_time}～${r.end_time}　<strong>${r.ot_hours}小時</strong><span style="background:var(--bg);padding:1px 6px;border-radius:8px;margin-left:4px">${DAY_TYPE[r.day_type||'weekday']||r.day_type}</span></div></div>
+          <div><span class="card-title">${escHtml(r.staff_name||'')}</span>${r.staff_role?`<span style="font-size:12px;color:var(--muted);margin-left:8px">${escHtml(r.staff_role)}</span>`:''}<div style="font-size:12px;color:var(--muted);margin-top:3px">${rocDate(r.request_date)}　${r.start_time}～${r.end_time}　<strong>${r.ot_hours}小時</strong><span style="background:var(--bg);padding:1px 6px;border-radius:8px;margin-left:4px">${DAY_TYPE[r.day_type||'weekday']||r.day_type}</span></div></div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span style="font-size:12px;font-weight:700;color:${sc}">${sl}</span>
           ${r.status==='pending' ? `<button class="btn btn-primary btn-sm" onclick="openOTReview(${r.id})">審核</button>` : ''}
@@ -5235,7 +5303,7 @@ async function openOTReview(id) {
   document.getElementById('otrm-id').value = id; document.getElementById('otrm-by').value = ''; document.getElementById('otrm-note').value = '';
   document.getElementById('otrm-title').textContent = `審核加班申請 — ${r.staff_name}`;
   const dtLabel = {weekday:'平日',rest_day:'休息日',holiday:'國定假日',special:'例假日'}[r.day_type||'weekday'];
-  document.getElementById('otrm-info').innerHTML = `<strong>${escHtml(r.staff_name)}</strong>　<span style="background:var(--bg);padding:1px 8px;border-radius:8px;font-size:12px">${dtLabel}</span><br>日期：${r.request_date}　時間：${r.start_time}～${r.end_time}　<strong>${r.ot_hours} 小時</strong><br><span style="color:var(--muted)">原因：${escHtml(r.reason)}</span>`;
+  document.getElementById('otrm-info').innerHTML = `<strong>${escHtml(r.staff_name)}</strong>　<span style="background:var(--bg);padding:1px 8px;border-radius:8px;font-size:12px">${dtLabel}</span><br>日期：${rocDate(r.request_date)}　時間：${r.start_time}～${r.end_time}　<strong>${r.ot_hours} 小時</strong><br><span style="color:var(--muted)">原因：${escHtml(r.reason)}</span>`;
   const prevEl = document.getElementById('otrm-pay-preview');
   prevEl.style.display = 'none';
   const { ok: pok, data: pd } = await api('/api/overtime/calc-preview', apiJSON({ staff_id: r.staff_id, ot_hours: r.ot_hours, day_type: r.day_type||'weekday' }), true);
@@ -5902,7 +5970,7 @@ async function updateLeavePendingHint() {
   if (!ok || !Array.isArray(data)) { hint.style.display = 'none'; return; }
   const hidden = data.filter(r => String(r.start_date || '').slice(0, 7) !== month);
   if (!hidden.length) { hint.style.display = 'none'; return; }
-  const preview = hidden.slice(0, 3).map(r => `${r.staff_name} ${r.start_date}`).join('、');
+  const preview = hidden.slice(0, 3).map(r => `${r.staff_name} ${rocDate(r.start_date)}`).join('、');
   hint.innerHTML = `⚠ 另有 <strong>${hidden.length}</strong> 筆待審假單不在 ${month}（${escHtml(preview)}${hidden.length > 3 ? '…' : ''}）
     <button class="btn btn-outline btn-sm" onclick="showAllPendingLeave()">查看全部待審</button>`;
   hint.style.display = 'flex';
@@ -5954,7 +6022,7 @@ function renderLeaveRequests() {
             return `<span style="margin-left:6px;padding:1px 7px;border-radius:10px;font-size:11px;background:#f0f2f8;color:var(--muted)">餘額 ${bal.remain.toFixed(1)} 天</span>`;
           })()}
           <div style="font-size:12px;color:var(--muted);margin-top:3px">
-            ${r.start_date}${sHalf}${r.total_hours ? '' : ` ~ ${r.end_date}${eHalf}`}
+            ${rocDate(r.start_date)}${sHalf}${r.total_hours ? '' : ` ~ ${rocDate(r.end_date)}${eHalf}`}
             &nbsp;|&nbsp; <strong>${r.total_hours ? r.total_hours + ' 小時' : r.total_days + ' 天'}</strong>
             &nbsp;|&nbsp; 薪資倍率：${r.pay_rate===1?'全薪':r.pay_rate===0?'無薪':r.pay_rate+'倍'}
           </div>
@@ -6148,7 +6216,7 @@ function openLeaveReview(id) {
   document.getElementById('lrm-info').innerHTML = `
     <strong>${escHtml(r.staff_name)}</strong>
     <span style="margin-left:8px;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:700;background:${r.leave_color||'#4a7bda'}22;color:${r.leave_color||'#4a7bda'}">${escHtml(r.leave_type_name)}</span><br>
-    ${r.start_date}${sh}${r.total_hours ? '' : ` ~ ${r.end_date}${eh}`}　<strong>${r.total_hours ? r.total_hours + ' 小時' : r.total_days + ' 天'}</strong><br>
+    ${rocDate(r.start_date)}${sh}${r.total_hours ? '' : ` ~ ${rocDate(r.end_date)}${eh}`}　<strong>${r.total_hours ? r.total_hours + ' 小時' : r.total_days + ' 天'}</strong><br>
     <span style="color:var(--muted)">${escHtml(r.reason||'（無說明）')}</span>${balHtml}`;
   const certSec  = document.getElementById('lrm-cert-section');
   const certLink = document.getElementById('lrm-cert-link');
@@ -6298,7 +6366,7 @@ async function initAnnualLeave() {
   if (!ok) return;
   // Show per-person results
   const details = data.details || [];
-  const summary = details.map(d => `${escHtml(d.name)}：${d.days}天${d.hire_date?'（'+d.hire_date+'到職）':''}`).join('、');
+  const summary = details.map(d => `${escHtml(d.name)}：${d.days}天${d.hire_date?'（'+rocDate(d.hire_date)+'到職）':''}`).join('、');
   document.getElementById('leave-bal-note').textContent = `已計算 ${data.updated} 位員工`;
   showToast(`${year}年特休計算完成（${data.updated}人）`, 'success');
   await loadLeaveBalances();
@@ -6333,7 +6401,7 @@ async function showAnnualSchedule(staffId, staffName) {
         <div>
           <div style="font-size:15px;font-weight:700;color:var(--navy)">${escHtml(staffName)} 特休排程</div>
           <div style="font-size:12px;color:var(--muted);margin-top:2px">
-            到職日：${data.hire_date || '未設定'}　|　目前特休：<strong style="color:var(--green)">${data.current_days} 天/年</strong>
+            到職日：${rocDate(data.hire_date) || '未設定'}　|　目前特休：<strong style="color:var(--green)">${data.current_days} 天/年</strong>
           </div>
         </div>
         <button onclick="document.getElementById('annual-sched-popup').remove()"
@@ -7618,7 +7686,7 @@ async function loadFinRecords() {
       ? `<button class="btn btn-sm" style="margin-left:4px;background:rgba(74,123,218,0.12);color:var(--accent);border:none;font-size:11px;padding:2px 7px" onclick="openOcrRawModal(${r.id})" title="查看 OCR 辨識來源">OCR</button>`
       : '';
     return `<tr>
-      <td style="font-family:'DM Mono',monospace;font-size:12px">${r.record_date}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px">${rocDate(r.record_date)}</td>
       <td>${typeBadge}${ocrBadge}</td>
       <td>${catDot}${escHtml(r.category_name||'—')}</td>
       <td style="font-weight:600">${escHtml(r.title)}</td>
@@ -8332,7 +8400,7 @@ async function loadFinDocuments() {
         ? `<span class="badge badge-ok">已建立記帳</span>`
         : `<span class="badge" style="background:rgba(200,169,110,0.15);color:#a07830">未建立</span>`;
       return `<tr>
-        <td style="font-family:'DM Mono',monospace;font-size:12px">${d.upload_date}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px">${rocDate(d.upload_date)}</td>
         <td style="font-size:12px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(d.filename)}">${escHtml(d.filename)}</td>
         <td><span class="badge" style="background:rgba(74,123,218,0.1);color:var(--accent)">${dtLabel}</span></td>
         <td style="text-align:right;font-family:'DM Mono',monospace;font-weight:600">${amt}</td>
@@ -8427,8 +8495,8 @@ async function loadRecurring() {
         <td>${freqLabel[r.frequency]||r.frequency}（${r.day_of_month}號）</td>
         <td style="text-align:right;font-family:'DM Mono',monospace;font-weight:600">$${r.amount.toLocaleString()}</td>
         <td style="font-size:12px;color:var(--muted)">${escHtml(r.vendor||'—')}</td>
-        <td style="font-size:12px">${r.start_date}</td>
-        <td style="font-size:12px;color:var(--muted)">${r.end_date||'—'}</td>
+        <td style="font-size:12px">${rocDate(r.start_date)}</td>
+        <td style="font-size:12px;color:var(--muted)">${rocDate(r.end_date)||'—'}</td>
         <td style="font-size:12px;color:var(--muted)">${r.last_generated||'未產生'}</td>
         <td>${activeBadge}</td>
         <td style="white-space:nowrap">
@@ -8568,10 +8636,10 @@ async function loadBankStatements() {
         ? '<span class="badge badge-ok" style="font-size:11px">已對帳</span>'
         : '<span class="badge badge-warn" style="font-size:11px">未對帳</span>';
       const matchedInfo = s.reconciled && s.matched_title
-        ? `<span style="font-size:12px;color:var(--accent)">${escHtml(s.matched_title)} (${s.matched_date})</span>`
+        ? `<span style="font-size:12px;color:var(--accent)">${escHtml(s.matched_title)} (${rocDate(s.matched_date)})</span>`
         : '<span style="font-size:12px;color:var(--muted)">—</span>';
       return `<tr>
-        <td style="font-family:'DM Mono',monospace;font-size:12px">${s.txn_date}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px">${rocDate(s.txn_date)}</td>
         <td style="font-size:12px">${escHtml(s.description||'—')}</td>
         <td>${typeBadge}</td>
         <td style="text-align:right;font-family:'DM Mono',monospace;font-weight:600;color:${s.txn_type==='credit'?'var(--green)':'var(--red)'}">$${s.amount.toLocaleString()}</td>
@@ -8788,7 +8856,7 @@ function filterBmmRecords(q) {
          onclick="confirmBankMatch(${r.id})">
       <div>
         <div style="font-weight:600;font-size:13px">${escHtml(r.title)}</div>
-        <div style="font-size:11px;color:var(--muted)">${r.record_date} · ${escHtml(r.category_name||'—')}</div>
+        <div style="font-size:11px;color:var(--muted)">${rocDate(r.record_date)} · ${escHtml(r.category_name||'—')}</div>
       </div>
       <div style="font-family:'DM Mono',monospace;font-weight:700;color:${r.type==='income'?'var(--green)':'var(--red)'}">$${r.amount.toLocaleString()}</div>
     </div>`).join('');
@@ -8991,7 +9059,7 @@ async function loadApList() {
         <td style="font-size:12px;color:var(--muted)">${escHtml(r.party_name||'—')}</td>
         <td style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace">${escHtml(r.invoice_no||'—')}</td>
         <td style="text-align:right;font-family:'DM Mono',monospace;font-weight:600">$${r.amount.toLocaleString()}</td>
-        <td style="font-size:12px">${r.due_date||'—'}</td>
+        <td style="font-size:12px">${rocDate(r.due_date)||'—'}</td>
         <td style="font-size:12px">${overdueBadge}</td>
         <td><span style="color:${sColor};font-weight:600;font-size:12px">${sLabel}</span></td>
         <td style="white-space:nowrap">
@@ -10338,8 +10406,8 @@ async function loadTrainingRecords() {
       <td>${escHtml(rec.staff_name)}</td>
       <td>${escHtml(rec.course_name)}</td>
       <td><span style="padding:2px 8px;border-radius:6px;font-size:11px;background:var(--gray-100,#f3f4f6)">${TRAINING_CAT_LABELS[rec.category]||rec.category}</span></td>
-      <td>${rec.completed_date||'—'}</td>
-      <td>${rec.expiry_date||'—'}</td>
+      <td>${rocDate(rec.completed_date)||'—'}</td>
+      <td>${rocDate(rec.expiry_date)||'—'}</td>
       <td style="font-size:12px;color:var(--muted)">${rec.certificate_no||'—'}</td>
       <td><span style="color:${statusColor};font-weight:600;font-size:12px">${statusLabel}</span></td>
       <td>
@@ -10378,8 +10446,8 @@ async function loadExpiringRecords() {
           <div style="font-weight:600;font-size:14px">${escHtml(rec.staff_name)} — ${escHtml(rec.course_name)}</div>
           <div style="font-size:12px;color:var(--muted);margin-top:3px">
             ${TRAINING_CAT_LABELS[rec.category]||rec.category}
-            ${rec.completed_date ? '・完成：' + rec.completed_date : ''}
-            ${rec.expiry_date ? '・到期：' + rec.expiry_date : ''}
+            ${rocDate(rec.completed_date) ? '・完成：' + rec.completed_date : ''}
+            ${rocDate(rec.expiry_date) ? '・到期：' + rec.expiry_date : ''}
           </div>
         </div>
         <div style="color:${color};font-weight:700;font-size:13px;white-space:nowrap">${label}</div>
@@ -10663,7 +10731,7 @@ function renderLaborLawTable() {
     const fetchedDate = r.fetched_at ? new Date(r.fetched_at).toLocaleDateString('zh-TW') : '—';
     const note = escStr(r.version_note || r.summary || '').substring(0, 80);
     return `<tr>
-      <td style="font-weight:700;color:var(--navy);white-space:nowrap">${escStr(r.amend_date)}</td>
+      <td style="font-weight:700;color:var(--navy);white-space:nowrap">${escStr(rocDate(r.amend_date))}</td>
       <td style="font-size:12px;color:var(--muted)">${note || '修正公告'}</td>
       <td style="text-align:center">${announcedBadge}</td>
       <td style="font-size:11px;color:var(--muted);white-space:nowrap">${fetchedDate}</td>
@@ -10776,10 +10844,10 @@ function renderDocsMatrix() {
         if (c.content) title += '：' + c.content;
         if (c.expiry_state === 'expired') {
           mark = '⚠'; color = 'var(--red)'; bg = 'var(--red-light)';
-          title = `已過期（${c.expiry_date}）`;
+          title = `已過期（${rocDate(c.expiry_date)}）`;
         } else if (c.expiry_state === 'expiring') {
           mark = '✓'; color = '#b45309'; bg = '#fef3c7';
-          title = `即將到期（${c.expiry_date}）`;
+          title = `即將到期（${rocDate(c.expiry_date)}）`;
         }
       } else if (c.status === 'na') {
         mark = '免'; color = 'var(--muted)'; bg = '#f1f4f9'; title = '免附';
@@ -11053,8 +11121,8 @@ function renderResignedStaff() {
     <td style="color:var(--muted)">${escHtml(s.employee_code||'')}</td>
     <td>${escHtml(s.department||'')}</td>
     <td>${escHtml(s.role||'')}</td>
-    <td style="font-family:'DM Mono',monospace">${s.hire_date||'—'}</td>
-    <td style="font-family:'DM Mono',monospace;color:var(--red)">${s.termination_date||'—'}</td>
+    <td style="font-family:'DM Mono',monospace">${rocDate(s.hire_date)||'—'}</td>
+    <td style="font-family:'DM Mono',monospace;color:var(--red)">${rocDate(s.termination_date)||'—'}</td>
     <td style="font-size:12px;color:var(--muted)">${escHtml(s.termination_reason||'')}</td>
     <td><button class="btn btn-outline btn-sm" onclick="reinstateStaff(${s.id},'${escHtml(s.name)}')">復職</button></td>
   </tr>`).join('');
@@ -11180,7 +11248,7 @@ function renderSalaryStaff() {
     <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">${escHtml(s.username||'')}</td>
     <td style="color:var(--muted)">${escHtml(s.department||'—')}</td>
     <td style="color:var(--muted)">${escHtml(s.position_title||'—')}</td>
-    <td style="font-family:'DM Mono',monospace;font-size:12px">${s.hire_date||'—'}</td>
+    <td style="font-family:'DM Mono',monospace;font-size:12px">${rocDate(s.hire_date)||'—'}</td>
     <td style="font-family:'DM Mono',monospace;font-weight:600;color:var(--navy)">$${fmtNum(s.base_salary)}</td>
     <td style="font-family:'DM Mono',monospace;color:var(--muted)">$${fmtNum(s.insured_salary)}</td>
     <td style="color:var(--muted)">${s.vacation_quota!=null?s.vacation_quota+'天':'預設'}</td>
@@ -11237,7 +11305,7 @@ function filterFinRecords() {
     const catDot = r.category_color ? `<span style="width:8px;height:8px;border-radius:2px;background:${r.category_color};display:inline-block;margin-right:4px"></span>` : '';
     const ocrBadge = r.document_id ? `<button class="btn btn-sm" style="margin-left:4px;background:rgba(74,123,218,0.12);color:var(--accent);border:none;font-size:11px;padding:2px 7px" onclick="openOcrRawModal(${r.id})">OCR</button>` : '';
     return `<tr>
-      <td style="font-family:'DM Mono',monospace;font-size:12px">${r.record_date}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px">${rocDate(r.record_date)}</td>
       <td>${typeBadge}${ocrBadge}</td>
       <td>${catDot}${escHtml(r.category_name||'—')}</td>
       <td style="font-weight:600">${escHtml(r.title)}</td>
@@ -11331,7 +11399,7 @@ function filterExpenseReview() {
   tbody.innerHTML = list.map(c => `
     <tr>
       <td>${esc(c.staff_name||'—')}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:12px">${c.expense_date}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px">${rocDate(c.expense_date)}</td>
       <td>${esc(c.category)}</td>
       <td style="font-family:'DM Mono',monospace;text-align:right">NT$ ${fmtNum(c.amount)}</td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.note||'—')}</td>

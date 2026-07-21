@@ -316,7 +316,7 @@ html,body{min-height:100%;background:var(--navy);font-family:"Noto Sans TC",sans
         <div style="background:#fff;border-radius:12px;border:1.5px solid var(--border);padding:18px 16px;margin-bottom:16px">
           <div class="fm-section">
             <div class="fm-sec-head"><span class="dot"></span><span class="t">加班時段</span><span class="line"></span></div>
-            <div style="margin-bottom:10px"><div class="fl">加班日期</div><input class="fi" type="date" id="ot-date" style="margin-bottom:0"></div>
+            <div style="margin-bottom:10px"><div class="fl">加班日期</div><roc-date id="ot-date" style="margin-bottom:0" data-input-class="fi"></roc-date></div>
             <div class="fm-grid2" style="margin-bottom:10px">
               <div><div class="fl">開始時間</div><input class="fi" type="time" id="ot-start" style="margin-bottom:0"></div>
               <div><div class="fl">結束時間</div><input class="fi" type="time" id="ot-end" style="margin-bottom:0"></div>
@@ -389,8 +389,8 @@ html,body{min-height:100%;background:var(--navy);font-family:"Noto Sans TC",sans
             <!-- 天數請假區 -->
             <div id="leave-dates-section">
               <div class="fm-grid2" style="margin-bottom:10px">
-                <div><div class="fl">開始日期 *</div><input class="fi" type="date" id="leave-start" style="margin-bottom:0" onchange="previewLeaveStaff()"></div>
-                <div><div class="fl">結束日期 *</div><input class="fi" type="date" id="leave-end"   style="margin-bottom:0" onchange="previewLeaveStaff()"></div>
+                <div><div class="fl">開始日期 *</div><roc-date id="leave-start" style="margin-bottom:0" onchange="previewLeaveStaff()" data-input-class="fi"></roc-date></div>
+                <div><div class="fl">結束日期 *</div><roc-date id="leave-end" style="margin-bottom:0" onchange="previewLeaveStaff()" data-input-class="fi"></roc-date></div>
               </div>
               <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
                 <label class="fm-check" style="font-size:12px"><input type="checkbox" id="leave-start-half" onchange="previewLeaveStaff()"> 開始日下午請假</label>
@@ -401,7 +401,7 @@ html,body{min-height:100%;background:var(--navy);font-family:"Noto Sans TC",sans
             <!-- 小時請假區 -->
             <div id="leave-hours-section" style="display:none">
               <div class="fm-grid2" style="margin-bottom:10px">
-                <div><div class="fl">請假日期 *</div><input class="fi" type="date" id="leave-hour-date" style="margin-bottom:0"></div>
+                <div><div class="fl">請假日期 *</div><roc-date id="leave-hour-date" style="margin-bottom:0" data-input-class="fi"></roc-date></div>
                 <div><div class="fl">請假時數 *（0.5～8）</div><input class="fi" type="number" id="leave-hour-count" min="0.5" max="8" step="0.5" placeholder="例：2" style="margin-bottom:0"></div>
               </div>
             </div>
@@ -522,7 +522,7 @@ html,body{min-height:100%;background:var(--navy);font-family:"Noto Sans TC",sans
             <div class="fm-section">
               <div class="fm-sec-head"><span class="dot"></span><span class="t">費用內容</span><span class="line"></span></div>
               <div class="fm-grid2" style="margin-bottom:10px">
-                <div><div class="fl">費用日期</div><input class="fi" type="date" id="exp-date" style="margin-bottom:0"></div>
+                <div><div class="fl">費用日期</div><roc-date id="exp-date" style="margin-bottom:0" data-input-class="fi"></roc-date></div>
                 <div><div class="fl">費用類型</div>
                   <select class="fi" id="exp-category" style="margin-bottom:0">
                     <option value="餐費">餐費</option>
@@ -589,6 +589,27 @@ html,body{min-height:100%;background:var(--navy);font-family:"Noto Sans TC",sans
 <div class="toast" id="toast"></div>
 
 <script>
+// ── 民國日期共用工具（與 admin 一致） ─────────────────────────
+function isoToRoc(iso){ if(!iso) return ''; const m=String(iso).slice(0,10).match(/^(\d{4})-(\d{2})-(\d{2})$/); if(!m) return ''; return `${parseInt(m[1],10)-1911}/${m[2]}/${m[3]}`; }
+function rocToIso(str){ if(!str) return ''; const p=String(str).trim().split(/[\/\-.]/); if(p.length!==3) return ''; let [y,mo,d]=p.map(x=>parseInt(x,10)); if([y,mo,d].some(isNaN)) return ''; if(y<1911) y+=1911; if(mo<1||mo>12||d<1||d>31) return ''; return `${String(y).padStart(4,'0')}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`; }
+function rocDate(v){ if(v==null) return ''; const s=String(v); return /^\d{4}-\d{2}-\d{2}$/.test(s) ? isoToRoc(s) : s; }
+class RocDateInput extends HTMLElement {
+  connectedCallback(){ if(this._built) return; this._built=true;
+    const cls=this.getAttribute('data-input-class')||'fi'; this.style.display='block';
+    this.innerHTML=`<span style="display:flex;align-items:center;gap:4px"><input type="text" inputmode="numeric" class="${cls}" placeholder="民國 例 115/07/21" style="flex:1;margin-bottom:0"><input type="date" tabindex="-1" title="日曆選取" style="width:32px;flex:none;padding:2px;opacity:.6;margin-bottom:0"></span>`;
+    this._text=this.querySelector('input[type=text]'); this._pick=this.querySelector('input[type=date]');
+    const stop=e=>e.stopPropagation();
+    this._text.addEventListener('change',e=>{stop(e);this._fromText();});
+    this._text.addEventListener('blur',()=>this._fromText());
+    this._pick.addEventListener('change',e=>{stop(e);this._setIso(this._pick.value,true);});
+    if(this._pending!=null){ this._setIso(this._pending,false); this._pending=null; }
+  }
+  _fromText(){ if(this._text.value.trim()===''){ this._setIso('',true); return; } const iso=rocToIso(this._text.value); if(!iso){ this._text.style.borderColor='#e11d48'; return; } this._setIso(iso,true); }
+  _setIso(iso,fire){ this._iso=iso||''; if(this._text){ this._text.value=isoToRoc(this._iso); this._text.style.borderColor=''; } if(this._pick) this._pick.value=this._iso; if(fire) this.dispatchEvent(new Event('change',{bubbles:true})); }
+  get value(){ return this._iso||''; }
+  set value(v){ if(!this._built){ this._pending=v; return; } this._setIso(v||'',false); }
+}
+customElements.define('roc-date', RocDateInput);
 const DAYS=['日','一','二','三','四','五','六'];
 const PLABEL={in:'上班打卡',out:'下班打卡',break_out:'休息開始',break_in:'休息結束'};
 const PLCLS={in:'lb-in',out:'lb-out',break_out:'lb-bout',break_in:'lb-bin'};
@@ -1210,7 +1231,7 @@ async function loadMyOTRequests(){
   wrap.innerHTML=list.map(r=>{
     const sc=OT_SC[r.status]||'var(--muted)';const sl=OT_SL[r.status]||r.status;
     const payStr=r.ot_pay>0?`<div style="font-size:13px;font-weight:700;color:var(--green);margin-top:4px">加班費：$${Number(r.ot_pay).toLocaleString()}</div>`:'';
-    return `<div style="border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px"><div style="padding:10px 14px;background:var(--bg);display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:700">${r.request_date}　${r.start_time}～${r.end_time}<span style="font-size:11px;font-weight:400;background:var(--bg);padding:1px 6px;border-radius:8px;margin-left:6px">${DAY_LABEL[r.day_type||'weekday']||''}</span></div><div style="font-size:12px;color:var(--muted);margin-top:2px">加班 <strong>${r.ot_hours}</strong> 小時</div></div><span style="font-size:12px;font-weight:700;color:${sc};padding:3px 10px;border-radius:10px;background:${sc}22">${sl}</span></div><div style="padding:10px 14px;font-size:12px;color:var(--text)">${esc(r.reason)}${payStr}${r.review_note?`<div style="color:${sc};margin-top:4px">意見：${esc(r.review_note)}</div>`:''}</div></div>`;
+    return `<div style="border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px"><div style="padding:10px 14px;background:var(--bg);display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:700">${rocDate(r.request_date)}　${r.start_time}～${r.end_time}<span style="font-size:11px;font-weight:400;background:var(--bg);padding:1px 6px;border-radius:8px;margin-left:6px">${DAY_LABEL[r.day_type||'weekday']||''}</span></div><div style="font-size:12px;color:var(--muted);margin-top:2px">加班 <strong>${r.ot_hours}</strong> 小時</div></div><span style="font-size:12px;font-weight:700;color:${sc};padding:3px 10px;border-radius:10px;background:${sc}22">${sl}</span></div><div style="padding:10px 14px;font-size:12px;color:var(--text)">${esc(r.reason)}${payStr}${r.review_note?`<div style="color:${sc};margin-top:4px">意見：${esc(r.review_note)}</div>`:''}</div></div>`;
   }).join('');
 }
 
@@ -1843,7 +1864,7 @@ async function showMyAnnualSchedule() {
           <div>
             <div style="font-size:15px;font-weight:700;color:var(--navy)">我的特休排程</div>
             <div style="font-size:12px;color:var(--muted);margin-top:2px">
-              到職日：${data.hire_date}　|　目前：<strong style="color:var(--green)">${data.current_days} 天/年</strong>
+              到職日：${rocDate(data.hire_date)}　|　目前：<strong style="color:var(--green)">${data.current_days} 天/年</strong>
             </div>
           </div>
           <button onclick="document.getElementById('annual-sched-popup-staff').remove()"
@@ -2038,7 +2059,7 @@ function renderMyLeaveList() {
           <span style="padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;background:${r.leave_color||'#4a7bda'}22;color:${r.leave_color||'#4a7bda'}">${esc(r.leave_type_name)}</span>
           <span style="font-size:11px;color:var(--muted);margin-left:8px">${payLabel}</span>
           <div style="font-size:12px;margin-top:4px;font-weight:600">
-            ${r.start_date}${sh}${r.total_hours ? '' : ` ～ ${r.end_date}${eh}`}
+            ${rocDate(r.start_date)}${sh}${r.total_hours ? '' : ` ～ ${rocDate(r.end_date)}${eh}`}
             <span style="font-weight:400;color:var(--muted);margin-left:6px">${r.total_hours ? `${r.total_hours} 小時` : `${r.total_days} 天`}</span>
           </div>
         </div>
@@ -2264,9 +2285,9 @@ async function loadMyProfile() {
     [d.employee_code, d.company, d.department, d.position_title].filter(Boolean).join('｜') || '—';
   const ro = [];
   if (d.national_id) ro.push(`身分證字號：${d.national_id}`);
-  if (d.hire_date)   ro.push(`到職日：${d.hire_date}`);
-  if (d.birth_date)  ro.push(`生日：${d.birth_date}`);
-  Object.entries(d.custom_fields || {}).forEach(([k, v]) => { if (v) ro.push(`${k}：${v}`); });
+  if (d.hire_date)   ro.push(`到職日：${rocDate(d.hire_date)}`);
+  if (d.birth_date)  ro.push(`生日：${rocDate(d.birth_date)}`);
+  Object.entries(d.custom_fields || {}).forEach(([k, v]) => { if (v) ro.push(`${k}：${rocDate(v)}`); });
   document.getElementById('mp-readonly').innerHTML =
     ro.length ? ro.map(x => escXml(x)).join('<br>') : '<span style="color:var(--muted)">（無其他資料）</span>';
   document.getElementById('mp-phone').value     = d.phone || '';
@@ -2399,7 +2420,7 @@ async function loadMyExpenses() {
     <div style="border-bottom:1px solid var(--border);padding:12px 0;display:flex;align-items:center;gap:10px">
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:14px;margin-bottom:2px">${esc(c.category)} — NT$ ${fmtNum(c.amount)}</div>
-        <div style="font-size:12px;color:var(--muted)">${c.expense_date} ${c.note ? '・'+esc(c.note) : ''}</div>
+        <div style="font-size:12px;color:var(--muted)">${rocDate(c.expense_date)} ${c.note ? '・'+esc(c.note) : ''}</div>
         ${c.reviewer_note ? `<div style="font-size:11px;color:var(--red);margin-top:2px">備注：${esc(c.reviewer_note)}</div>` : ''}
       </div>
       <div style="font-size:12px;font-weight:600;color:${statusColor[c.status]||'var(--muted)'}">

@@ -62,6 +62,15 @@ def _cell_str(v):
     return str(v).strip()
 
 
+def _roc(v):
+    """ISO 日期字串→民國年字串（115/07/21）；非日期原樣回傳。匯出用。"""
+    s = _cell_str(v)
+    m = re.match(r'^(\d{4})-(\d{2})-(\d{2})$', s)
+    if not m:
+        return s
+    return f'{int(m.group(1)) - 1911}/{m.group(2)}/{m.group(3)}'
+
+
 def _parse_date(s):
     """接受 YYYY-MM-DD / YYYY/MM/DD / 民國年，回傳 ISO 字串或 None"""
     s = _cell_str(s)
@@ -188,7 +197,7 @@ def staff_template():
     example = [
         'A001', '王小明', 'wang.ming', '', '一號案場', '店員', '永興公司',
         'A123456789', '0912345678', '王大明 0987654321', '無', '',
-        '男', '1990-05-20', '2024-01-05', '台北市信義區…',
+        '男', '79/05/20', '113/01/05', '台北市信義區…',
         '822', '中國信託', '信義分行', '1234567890123', '王小明', '在職',
     ] + [''] * len(defs)
     return _xlsx_response(_staff_wb([example], [d['name'] for d in defs]),
@@ -223,10 +232,13 @@ def staff_export():
                 row.append('')
             elif typ == 'active':
                 row.append('在職' if s['active'] else '離職')
+            elif typ == 'date':
+                row.append(_roc(s[field]))
             else:
                 row.append(_cell_str(s[field]))
         cf = s['custom_fields'] or {}
-        row += [_cell_str(cf.get(d['name'])) for d in defs]
+        row += [_roc(cf.get(d['name'])) if d.get('field_type') == 'date'
+                else _cell_str(cf.get(d['name'])) for d in defs]
         rows_data.append(row)
     return _xlsx_response(_staff_wb(rows_data, [d['name'] for d in defs]), 'staff_list.xlsx')
 
