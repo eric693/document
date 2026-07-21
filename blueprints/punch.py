@@ -2,6 +2,7 @@
 blueprints/punch.py — 員工打卡頁面、打卡記錄、補打卡申請、月出勤統計
 """
 import math
+import re as _re
 from datetime import datetime as _dt, timezone as _tz, timedelta as _td
 from datetime import date
 
@@ -566,12 +567,30 @@ def _clean_custom_fields(conn, b):
     return {k: str(v).strip() for k, v in cf.items() if k in valid and len(str(v)) <= 2000}
 
 
+_FIELD_TYPES = ('text', 'number', 'date', 'select')
+
+
+def _parse_field_options(b):
+    """下拉選項：接受陣列或以逗號／頓號／換行分隔的字串，回傳去重後清單。"""
+    raw = b.get('options')
+    items = raw if isinstance(raw, list) else _re.split(r'[\n,、，]', str(raw or ''))
+    seen, out = set(), []
+    for x in items:
+        x = str(x).strip()
+        if x and x not in seen and len(x) <= 100:
+            seen.add(x)
+            out.append(x)
+        if len(out) >= 50:
+            break
+    return out
+
+
 @bp.route('/api/punch/field-defs', methods=['GET'])
 @require_module('punch')
 def api_field_defs_list():
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT id, name, field_type, sort_order, active FROM staff_field_defs "
+            "SELECT id, name, field_type, sort_order, active, field_options FROM staff_field_defs "
             "ORDER BY sort_order, id").fetchall()
     return jsonify([dict(r) for r in rows])
 
@@ -583,13 +602,17 @@ def api_field_defs_create():
     name = (b.get('name') or '').strip()
     if not name:
         return jsonify({'error': '請輸入欄位名稱'}), 400
-    ftype = b.get('field_type') if b.get('field_type') in ('text', 'number', 'date') else 'text'
+    ftype = b.get('field_type') if b.get('field_type') in _FIELD_TYPES else 'text'
+    opts = _parse_field_options(b) if ftype == 'select' else []
+    if ftype == 'select' and not opts:
+        return jsonify({'error': '下拉欄位請至少填一個選項'}), 400
     try:
         with get_db() as conn:
             mx = conn.execute("SELECT COALESCE(MAX(sort_order),0)+1 AS n FROM staff_field_defs").fetchone()
             row = conn.execute(
-                "INSERT INTO staff_field_defs (name, field_type, sort_order) VALUES (%s,%s,%s) RETURNING id",
-                (name, ftype, mx['n'])).fetchone()
+                "INSERT INTO staff_field_defs (name, field_type, sort_order, field_options) "
+                "VALUES (%s,%s,%s,%s) RETURNING id",
+                (name, ftype, mx['n'], Json(opts))).fetchone()
         return jsonify({'ok': True, 'id': row['id']})
     except psycopg.errors.UniqueViolation:
         return jsonify({'error': '已有同名欄位'}), 400
@@ -602,15 +625,18 @@ def api_field_defs_update(fid):
     name = (b.get('name') or '').strip()
     if not name:
         return jsonify({'error': '請輸入欄位名稱'}), 400
-    ftype = b.get('field_type') if b.get('field_type') in ('text', 'number', 'date') else 'text'
+    ftype = b.get('field_type') if b.get('field_type') in _FIELD_TYPES else 'text'
+    opts = _parse_field_options(b) if ftype == 'select' else []
+    if ftype == 'select' and not opts:
+        return jsonify({'error': '下拉欄位請至少填一個選項'}), 400
     try:
         with get_db() as conn:
             old = conn.execute("SELECT name FROM staff_field_defs WHERE id=%s", (fid,)).fetchone()
             if not old:
                 return jsonify({'error': '欄位不存在'}), 404
             conn.execute(
-                "UPDATE staff_field_defs SET name=%s, field_type=%s, active=%s WHERE id=%s",
-                (name, ftype, bool(b.get('active', True)), fid))
+                "UPDATE staff_field_defs SET name=%s, field_type=%s, active=%s, field_options=%s WHERE id=%s",
+                (name, ftype, bool(b.get('active', True)), Json(opts), fid))
             # 改名時同步搬移所有員工的既有值
             if old['name'] != name:
                 conn.execute("""

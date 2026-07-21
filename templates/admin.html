@@ -275,8 +275,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <!-- 月份選擇器 -->
     <div class="filter-bar" style="margin-bottom:20px;gap:12px;flex-wrap:wrap">
       <span class="filter-label">查詢月份</span>
-      <input type="month" class="filter-input" id="dash-month-picker"
-             style="min-width:150px" onchange="initDash()">
+      <roc-month id="dash-month-picker" style="min-width:150px" onchange="initDash()" data-input-class="filter-input"></roc-month>
       <button class="btn btn-outline btn-sm" onclick="initDash()">重新整理</button>
       <button class="btn btn-ghost btn-sm" onclick="resetDashMonth()">回到本月</button>
       <span id="ds-month-badge"
@@ -453,7 +452,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="punch-panel-summary">
       <div class="filter-bar" style="margin-bottom:20px;gap:12px;flex-wrap:wrap">
         <span class="filter-label">月份</span>
-        <input class="filter-input" type="month" id="sum-month" onchange="loadPunchSummary()">
+        <roc-month id="sum-month" onchange="loadPunchSummary()" data-input-class="filter-input"></roc-month>
         <span style="flex:1"></span>
         <a href="/staff" target="_blank" class="btn btn-outline btn-sm">員工系統</a>
         <button class="btn btn-primary btn-sm" onclick="exportAttSummary()">匯出摘要 Excel</button>
@@ -483,7 +482,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         <roc-date id="rec-filter-to" onchange="loadPunchRecords()" data-input-class="filter-input"></roc-date>
         <div class="filter-divider"></div>
         <span class="filter-label">月份</span>
-        <input class="filter-input" type="month" id="rec-filter-month" onchange="recMonthChange()">
+        <roc-month id="rec-filter-month" onchange="recMonthChange()" data-input-class="filter-input"></roc-month>
         <button class="btn btn-ghost btn-sm" onclick="clearRecFilter()">清除</button>
       </div>
       <div class="card">
@@ -559,7 +558,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="punch-panel-requests" style="display:none">
       <div class="filter-bar" style="margin-bottom:20px;gap:12px;flex-wrap:wrap">
         <span class="filter-label">月份</span>
-        <input class="filter-input" type="month" id="preq-filter-month" onchange="loadPunchRequests()" style="min-width:140px">
+        <roc-month id="preq-filter-month" onchange="loadPunchRequests()" style="min-width:140px" data-input-class="filter-input"></roc-month>
         <div class="filter-divider"></div>
         <span class="filter-label">狀態</span>
         <select class="filter-input" id="preq-filter-status" onchange="loadPunchRequests()" style="min-width:120px">
@@ -581,7 +580,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="punch-panel-overtime" style="display:none">
       <div class="filter-bar" style="margin-bottom:20px;gap:12px;flex-wrap:wrap">
         <span class="filter-label">月份</span>
-        <input class="filter-input" type="month" id="ot-filter-month" onchange="otFilterChanged()">
+        <roc-month id="ot-filter-month" onchange="otFilterChanged()" data-input-class="filter-input"></roc-month>
         <div class="filter-divider"></div>
         <span class="filter-label">狀態</span>
         <select class="filter-input" id="ot-filter-status" onchange="loadOTRequests()" style="min-width:120px">
@@ -738,7 +737,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         <button class="btn btn-primary btn-sm" onclick="batchFixAnomalies()" id="anomaly-batchfix-btn" disabled>批次補登</button>
         <span style="flex:1"></span>
         <span class="filter-label">月份</span>
-        <input class="filter-input" type="month" id="anomaly-export-month" style="width:140px">
+        <roc-month id="anomaly-export-month" style="width:140px" data-input-class="filter-input"></roc-month>
         <button class="btn btn-outline btn-sm" onclick="exportAnomalyExcel()">匯出 Excel</button>
         <button class="btn btn-ghost btn-sm" onclick="exportAnomalyPdf()">匯出 PDF</button>
         <button class="btn btn-outline btn-sm" onclick="loadPunchAnomalies()">重新整理</button>
@@ -757,7 +756,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="punch-panel-mstats" style="display:none">
       <div class="filter-bar" style="margin-bottom:16px;gap:12px;flex-wrap:wrap">
         <span class="filter-label">月份</span>
-        <input class="filter-input" type="month" id="mstats-month" onchange="loadMonthlyStats()">
+        <roc-month id="mstats-month" onchange="loadMonthlyStats()" data-input-class="filter-input"></roc-month>
         <button class="btn btn-primary btn-sm" onclick="loadMonthlyStats()">查詢</button>
         <span style="flex:1"></span>
         <button class="btn btn-outline btn-sm" onclick="exportMonthlyStats()">匯出 CSV</button>
@@ -802,7 +801,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="sched-panel-shift">
       <div class="filter-bar" style="margin-bottom:16px;gap:12px;flex-wrap:wrap">
         <span class="filter-label">月份</span>
-        <input class="filter-input" type="month" id="shift-month" onchange="loadShiftCalendar()">
+        <roc-month id="shift-month" onchange="loadShiftCalendar()" data-input-class="filter-input"></roc-month>
         <span style="flex:1"></span>
         <button class="btn btn-outline btn-sm" onclick="exportShiftExcel()">匯出 Excel</button>
         <button class="btn btn-outline btn-sm" onclick="openShiftImportModal()">匯入班表</button>
@@ -836,7 +835,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="sched-panel-calendar" style="display:none">
       <div class="filter-bar" style="margin-bottom:20px;gap:12px;flex-wrap:wrap">
         <span class="filter-label">月份</span>
-        <input class="filter-input" type="month" id="sched-cal-month" onchange="loadSchedCalendar()">
+        <roc-month id="sched-cal-month" onchange="loadSchedCalendar()" data-input-class="filter-input"></roc-month>
         <span style="flex:1"></span>
         <a href="/staff" target="_blank" class="btn btn-outline btn-sm">員工系統</a>
       </div>
@@ -847,7 +846,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="sched-panel-requests" style="display:none">
       <div class="filter-bar" style="margin-bottom:20px;gap:12px;flex-wrap:wrap">
         <span class="filter-label">月份</span>
-        <input class="filter-input" type="month" id="sched-req-month" onchange="loadSchedRequests()">
+        <roc-month id="sched-req-month" onchange="loadSchedRequests()" data-input-class="filter-input"></roc-month>
         <div class="filter-divider"></div>
         <span class="filter-label">狀態</span>
         <select class="filter-input" id="sched-req-status" onchange="loadSchedRequests()" style="min-width:120px">
@@ -865,7 +864,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="sched-panel-summary" style="display:none">
       <div class="filter-bar" style="margin-bottom:20px;gap:12px">
         <span class="filter-label">月份</span>
-        <input class="filter-input" type="month" id="sched-sum-month" onchange="loadSchedSummary()">
+        <roc-month id="sched-sum-month" onchange="loadSchedSummary()" data-input-class="filter-input"></roc-month>
       </div>
       <div class="card">
         <div class="table-wrap">
@@ -881,7 +880,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="sched-panel-conflicts" style="display:none">
       <div class="filter-bar" style="margin-bottom:16px;gap:12px;flex-wrap:wrap">
         <span class="filter-label">月份</span>
-        <input class="filter-input" type="month" id="conflicts-month" onchange="loadShiftConflicts()">
+        <roc-month id="conflicts-month" onchange="loadShiftConflicts()" data-input-class="filter-input"></roc-month>
         <span style="flex:1"></span>
         <button class="btn btn-outline btn-sm" onclick="loadShiftConflicts()">重新檢查</button>
       </div>
@@ -894,7 +893,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <div style="max-width:440px">
         <div class="card" style="padding:24px">
           <div class="card-title" style="padding:0;margin-bottom:18px">月份排班設定</div>
-          <div style="margin-bottom:14px"><label class="form-label">設定月份</label><input class="filter-input" type="month" id="cfg-month" onchange="loadSchedConfig()" style="width:100%"></div>
+          <div style="margin-bottom:14px"><label class="form-label">設定月份</label><roc-month id="cfg-month" onchange="loadSchedConfig()" style="width:100%" data-input-class="filter-input"></roc-month></div>
           <div class="form-row">
             <div><label class="form-label">每日最多休假人數</label><input class="form-input" type="number" id="cfg-max-off" min="1" max="20" value="2"></div>
             <div><label class="form-label">每人每月休假配額（天）</label><input class="form-input" type="number" id="cfg-quota" min="1" max="31" value="8"></div>
@@ -926,7 +925,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
           <div class="card-title" style="padding:0;margin-bottom:14px">產生班表建議</div>
           <div style="margin-bottom:12px">
             <label class="form-label">排班月份</label>
-            <input type="month" id="autogen-month" class="form-input" style="width:100%">
+            <roc-month id="autogen-month" style="width:100%" data-input-class="form-input"></roc-month>
           </div>
           <div style="margin-bottom:16px;display:flex;align-items:center;gap:8px">
             <input type="checkbox" id="autogen-overwrite" style="width:16px;height:16px">
@@ -955,7 +954,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="leave-panel-requests">
       <div class="filter-bar" style="margin-bottom:20px;gap:12px;flex-wrap:wrap">
         <span class="filter-label">月份</span>
-        <input class="filter-input" type="month" id="leave-req-month" onchange="loadLeaveRequests()">
+        <roc-month id="leave-req-month" onchange="loadLeaveRequests()" data-input-class="filter-input"></roc-month>
         <div class="filter-divider"></div>
         <span class="filter-label">狀態</span>
         <select class="filter-input" id="leave-req-status" onchange="loadLeaveRequests()" style="min-width:110px">
@@ -986,7 +985,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="leave-panel-calendar" style="display:none">
       <div class="filter-bar" style="margin-bottom:20px;gap:12px;flex-wrap:wrap">
         <span class="filter-label">月份</span>
-        <input class="filter-input" type="month" id="leave-cal-month" onchange="loadLeaveCalendar()">
+        <roc-month id="leave-cal-month" onchange="loadLeaveCalendar()" data-input-class="filter-input"></roc-month>
       </div>
       <div id="leave-cal-wrap"></div>
     </div>
@@ -1049,7 +1048,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="salary-panel-calc">
       <div class="filter-bar" style="margin-bottom:20px;gap:12px;flex-wrap:wrap">
         <span class="filter-label">月份</span>
-        <input class="filter-input" type="month" id="sal-month" onchange="loadSalaryRecords()">
+        <roc-month id="sal-month" onchange="loadSalaryRecords()" data-input-class="filter-input"></roc-month>
         <div class="filter-divider"></div>
         <select class="filter-input" id="sal-filter-dept" onchange="renderSalaryTable()" style="min-width:110px"><option value="">全部案場</option></select>
         <select class="filter-input" id="sal-filter-emp" onchange="renderSalaryTable()" style="min-width:110px">
@@ -1247,7 +1246,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
             </div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
               <div><label class="form-label">事件日期</label><roc-date id="edi-event-date" style="width:100%" data-input-class="form-input"></roc-date></div>
-              <div><label class="form-label">薪資調整月份</label><input type="month" id="edi-salary-month" class="form-input" style="width:100%"></div>
+              <div><label class="form-label">薪資調整月份</label><roc-month id="edi-salary-month" style="width:100%" data-input-class="form-input"></roc-month></div>
             </div>
           </div>
           <div style="display:flex;flex-direction:column;gap:8px">
@@ -1356,7 +1355,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="fin-panel-dash">
       <div class="filter-bar" style="margin-bottom:16px;gap:12px;flex-wrap:wrap">
         <span class="filter-label">月份</span>
-        <input class="filter-input" type="month" id="fin-dash-month" onchange="loadFinSummary()">
+        <roc-month id="fin-dash-month" onchange="loadFinSummary()" data-input-class="filter-input"></roc-month>
         <span style="flex:1"></span>
         <button class="btn btn-outline btn-sm" onclick="exportFinance()">匯出 Excel</button>
         <button class="btn btn-ghost btn-sm" onclick="exportFinancePdf()">匯出 PDF</button>
@@ -1404,7 +1403,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="fin-panel-records" style="display:none">
       <div class="filter-bar" style="margin-bottom:16px;gap:12px;flex-wrap:wrap">
         <span class="filter-label">月份</span>
-        <input class="filter-input" type="month" id="fin-rec-month" onchange="loadFinRecords()">
+        <roc-month id="fin-rec-month" onchange="loadFinRecords()" data-input-class="filter-input"></roc-month>
         <select class="filter-input" id="fin-rec-type" onchange="loadFinRecords()" style="min-width:100px">
           <option value="">全部</option><option value="income">收入</option><option value="expense">支出</option>
         </select>
@@ -1517,7 +1516,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
         <div style="font-weight:600;font-size:15px">銀行對帳</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <input class="filter-input" type="month" id="bank-month" onchange="loadBankStatements()">
+          <roc-month id="bank-month" onchange="loadBankStatements()" data-input-class="filter-input"></roc-month>
           <button class="btn btn-outline btn-sm" onclick="document.getElementById('bank-csv-file').click()">匯入對帳單 CSV</button>
           <input type="file" id="bank-csv-file" accept=".csv" style="display:none" onchange="importBankCSV(this)">
           <button class="btn btn-outline btn-sm" id="bank-auto-btn" onclick="bankAutoMatch()">自動比對</button>
@@ -1602,7 +1601,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="fin-panel-budget" style="display:none">
       <div class="filter-bar" style="margin-bottom:16px;gap:12px;flex-wrap:wrap">
         <span class="filter-label">年月</span>
-        <input class="filter-input" type="month" id="budget-month" onchange="loadBudgetVsActual()">
+        <roc-month id="budget-month" onchange="loadBudgetVsActual()" data-input-class="filter-input"></roc-month>
         <button class="btn btn-primary btn-sm" onclick="openBudgetEditModal()">設定預算</button>
       </div>
       <!-- 總覽數字 -->
@@ -1633,7 +1632,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
     <div id="fin-panel-stmts" style="display:none">
       <div class="filter-bar" style="margin-bottom:16px;gap:12px;flex-wrap:wrap">
         <span class="filter-label">月份</span>
-        <input class="filter-input" type="month" id="fin-stmt-month">
+        <roc-month id="fin-stmt-month" data-input-class="filter-input"></roc-month>
         <button class="btn btn-primary btn-sm" onclick="loadStatements()">產生報表</button>
         <span style="flex:1"></span>
         <button class="btn btn-outline btn-sm" id="fin-stmt-dl-btn" style="display:none" onclick="downloadStatements()">下載 Excel (.xlsx)</button>
@@ -2031,7 +2030,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
   <div class="page" id="page-expense-review" style="display:none">
     <div class="filter-bar" style="margin-bottom:20px;gap:10px;flex-wrap:wrap">
       <span class="filter-label">月份</span>
-      <input class="filter-input" type="month" id="exp-filter-month" style="min-width:140px" oninput="filterExpenseReview()">
+      <roc-month id="exp-filter-month" style="min-width:140px" oninput="filterExpenseReview()" data-input-class="filter-input"></roc-month>
       <div class="filter-divider"></div>
       <span class="filter-label">狀態</span>
       <select id="exp-review-status" class="filter-input" style="min-width:100px" onchange="loadExpenseReview()">
@@ -2074,7 +2073,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
           <option value="">全部員工</option>
         </select>
         <span class="filter-label">期間</span>
-        <input type="month" id="perf-filter-period" class="filter-input">
+        <roc-month id="perf-filter-period" data-input-class="filter-input"></roc-month>
         <button class="btn btn-primary btn-sm" onclick="loadPerfReviews()">查詢</button>
         <button class="btn btn-ghost btn-sm" onclick="exportPerfExcel()">匯出 Excel</button>
         <button class="btn btn-ghost btn-sm" onclick="exportPerfPdf()">匯出 PDF</button>
@@ -2108,7 +2107,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
               <div class="form-group"><label class="form-label">考核範本</label>
                 <select id="pf-template" class="form-input" onchange="loadPerfTemplateItems()"><option value="">選擇範本</option></select>
               </div>
-              <div class="form-group"><label class="form-label">考核期間</label><input type="month" id="pf-period" class="form-input"></div>
+              <div class="form-group"><label class="form-label">考核期間</label><roc-month id="pf-period" data-input-class="form-input"></roc-month></div>
               <div class="form-group"><label class="form-label">考核人</label><input type="text" id="pf-reviewer" class="form-input" placeholder="考核人姓名" style="font-family:'Noto Sans TC',sans-serif"></div>
             </div>
           </div>
@@ -2487,12 +2486,13 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
         <div class="fm-sec-head"><span class="dot"></span><span class="t">自訂欄位</span><span class="line"></span></div>
         <div class="fm-note" style="margin:0 0 10px">新增的欄位會出現在員工表單「自訂欄位」區塊，並自動支援整批匯入匯出。刪除欄位會一併移除所有員工上的該欄位值。</div>
         <div id="ss-field-list" style="display:flex;flex-direction:column;gap:8px"></div>
-        <div style="display:flex;gap:8px;margin-top:12px">
-          <input class="form-input" id="ss-field-new" placeholder="欄位名稱，例：血型、制服尺寸" style="flex:1;font-family:'Noto Sans TC',sans-serif" onkeydown="if(event.key==='Enter')addFieldDef()">
-          <select class="form-input" id="ss-field-type" style="width:100px">
-            <option value="text">文字</option><option value="number">數字</option><option value="date">日期</option>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+          <input class="form-input" id="ss-field-new" placeholder="欄位名稱，例：血型、制服尺寸" style="flex:1;min-width:140px;font-family:'Noto Sans TC',sans-serif" onkeydown="if(event.key==='Enter')addFieldDef()">
+          <select class="form-input" id="ss-field-type" style="width:100px" onchange="_toggleNewFieldOpts()">
+            <option value="text">文字</option><option value="number">數字</option><option value="date">日期</option><option value="select">下拉</option>
           </select>
           <button class="btn btn-outline" onclick="addFieldDef()">新增欄位</button>
+          <input class="form-input" id="ss-field-options" placeholder="下拉選項，逗號分隔，例：S,M,L,XL" style="display:none;flex:1 1 100%;font-family:'Noto Sans TC',sans-serif" onkeydown="if(event.key==='Enter')addFieldDef()">
         </div>
       </div>
     </div>
@@ -2618,7 +2618,7 @@ tbody td.date-cell { font-family: 'Noto Sans TC', sans-serif; font-weight: 500; 
       <div style="margin-bottom:4px">
         <label class="form-label">選擇日期（可多選）</label>
         <div style="font-size:11px;color:var(--muted);margin-bottom:8px">點擊月曆格子選取日期</div>
-        <input type="month" class="filter-input" id="sam-month" onchange="renderSamCalendar()" style="margin-bottom:10px">
+        <roc-month id="sam-month" onchange="renderSamCalendar()" style="margin-bottom:10px" data-input-class="filter-input"></roc-month>
         <div id="sam-calendar"></div>
         <div id="sam-selected-dates" style="font-size:12px;color:var(--muted);margin-top:8px;min-height:16px"></div>
       </div>
@@ -3383,6 +3383,61 @@ class RocDateInput extends HTMLElement {
 }
 customElements.define('roc-date', RocDateInput);
 
+// ── 民國月份工具與 <roc-month> 元件（對外 .value 仍是西元 YYYY-MM）──
+function isoToRocMonth(m) {
+  if (!m) return '';
+  const x = String(m).match(/^(\d{4})-(\d{2})$/);
+  return x ? `民國${parseInt(x[1], 10) - 1911}年${x[2]}月` : '';
+}
+function rocMonthToIso(str) {
+  const s = String(str || '').trim();
+  let m = s.match(/民?國?\s*(\d{1,4})\s*年\s*(\d{1,2})\s*月?/) || s.match(/^(\d{3,4})[-/.](\d{1,2})$/);
+  if (!m) return '';
+  let y = parseInt(m[1], 10), mo = parseInt(m[2], 10);
+  if (y < 1911) y += 1911;
+  if (mo < 1 || mo > 12) return '';
+  return `${String(y).padStart(4, '0')}-${String(mo).padStart(2, '0')}`;
+}
+// 唯讀顯示：西元 YYYY-MM → 民國115年07月；非此格式原樣回傳
+function rocMonth(m) { return isoToRocMonth(m) || (m || ''); }
+class RocMonthInput extends HTMLElement {
+  connectedCallback() {
+    if (this._built) return; this._built = true;
+    const cls = this.getAttribute('data-input-class') || 'form-input';
+    this.style.display = 'block';
+    this.innerHTML =
+      `<span style="display:flex;align-items:center;gap:4px">` +
+      `<input type="text" inputmode="numeric" class="${cls}" placeholder="民國 例 115/07" style="flex:1;font-family:'DM Mono',monospace">` +
+      `<input type="month" tabindex="-1" title="選擇月份" style="width:32px;flex:none;padding:2px;opacity:.6;cursor:pointer">` +
+      `</span>`;
+    this._text = this.querySelector('input[type=text]');
+    this._pick = this.querySelector('input[type=month]');
+    const stop = e => e.stopPropagation();
+    this._text.addEventListener('change', e => { stop(e); this._fromText(); });
+    this._text.addEventListener('blur', () => this._fromText());
+    this._pick.addEventListener('change', e => { stop(e); this._setIso(this._pick.value, true); });
+    if (this._pending != null) { this._setIso(this._pending, false); this._pending = null; }
+  }
+  _fromText() {
+    if (this._text.value.trim() === '') { this._setIso('', true); return; }
+    const iso = rocMonthToIso(this._text.value);
+    if (!iso) { this._text.style.borderColor = 'var(--red, #e11d48)'; return; }
+    this._setIso(iso, true);
+  }
+  _setIso(iso, fire) {
+    this._iso = iso || '';
+    if (this._text) {
+      this._text.value = this._iso ? `${parseInt(this._iso.slice(0, 4), 10) - 1911}/${this._iso.slice(5, 7)}` : '';
+      this._text.style.borderColor = '';
+    }
+    if (this._pick) this._pick.value = this._iso;
+    if (fire) this.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  get value() { return this._iso || ''; }
+  set value(v) { if (!this._built) { this._pending = v; return; } this._setIso(v || '', false); }
+}
+customElements.define('roc-month', RocMonthInput);
+
 // ── 管理員身份 & 權限 ─────────────────────────────────────────
 const ADMIN_DISPLAY_NAME = {{ admin_display_name | tojson }};
 const ADMIN_PERMS        = {{ admin_permissions  | tojson }};
@@ -3551,7 +3606,7 @@ async function loadAnomalies() {
         <strong>${escHtml(a.name)}</strong>
         <span style="color:var(--muted);font-size:12px;margin-left:6px">${escHtml(a.department||a.role||'')}</span>
       </div>
-      <div style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap">${a.date}</div>
+      <div style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap">${rocDate(a.date)}</div>
       <div style="font-size:12px;color:var(--muted)">${escHtml(a.detail)}</div>
     </div>`).join('');
   if (data.anomalies.length > 20) {
@@ -3599,7 +3654,7 @@ function openTerminateModal(staffId, staffName) {
         </div>
         <div style="margin-bottom:12px">
           <label class="form-label">最後結薪月份</label>
-          <input class="form-input" type="month" id="tm-last-month" style="width:100%">
+          <roc-month id="tm-last-month" style="width:100%" data-input-class="form-input"></roc-month>
         </div>
         <div>
           <label class="form-label">備註</label>
@@ -3634,7 +3689,7 @@ async function confirmTerminate(staffId) {
   showToast(`${data.name} 已辦理離職`, 'success');
   await loadPunchStaffList();
   await loadResignedStaff();
-  if (month) showToast(`提醒：請至薪資管理為 ${data.name} 產生 ${month} 最後薪資`, 'info');
+  if (month) showToast(`提醒：請至薪資管理為 ${data.name} 產生 ${rocMonth(month)} 最後薪資`, 'info');
 }
 
 async function reinstateStaff(staffId, name) {
@@ -3884,7 +3939,7 @@ function renderDashStats(data, isCurrentMonth) {
   document.getElementById('ds-pending-sub').textContent = `補打${data.pending.punch} 加班${data.pending.ot} 排休${data.pending.sched} 請假${data.pending.leave}`;
 
   const salLabel = document.getElementById('ds-salary-label');
-  if (salLabel) salLabel.textContent = isCurrentMonth ? '本月薪資總額' : `${data.month} 薪資總額`;
+  if (salLabel) salLabel.textContent = isCurrentMonth ? '本月薪資總額' : `${rocMonth(data.month)} 薪資總額`;
   const netFmt = sal.total_net > 0 ? '$' + sal.total_net.toLocaleString('zh-TW', {maximumFractionDigits:0}) : '—';
   document.getElementById('ds-salary').textContent     = netFmt;
   document.getElementById('ds-salary-sub').textContent = `已確認 ${sal.confirmed_count} / 共 ${sal.total_count} 筆`;
@@ -4374,7 +4429,7 @@ async function loadPunchAnomalies() {
       <td><span style="color:${SEV_COLOR[a.severity]||'inherit'};font-weight:700">${SEV_LABEL[a.severity]||a.severity}</span></td>
       <td style="font-weight:600">${escHtml(a.name||'')}</td>
       <td style="color:var(--muted)">${escHtml(a.department||a.role||'')}</td>
-      <td style="font-family:'DM Mono',monospace;font-size:12px">${a.date||''}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px">${rocDate(a.date)||''}</td>
       <td>${escHtml(a.label||'')}</td>
       <td style="font-size:12px;color:var(--muted)">${escHtml(a.detail||'')}</td>
     </tr>`;
@@ -4406,7 +4461,7 @@ async function batchFixAnomalies() {
   if (!ok) { showToast((data && data.error) || '批次補登失敗', true); return; }
   let msg = `已補登 ${data.fixed} 筆`;
   if (data.skipped) {
-    const reasons = (data.skipped_items || []).map(s => `${s.name||''} ${s.date||''}（${s.reason||''}）`).join('\n');
+    const reasons = (data.skipped_items || []).map(s => `${s.name||''} ${rocDate(s.date)||''}（${s.reason||''}）`).join('\n');
     msg += `，跳過 ${data.skipped} 筆`;
     if (reasons) alert(`批次補登完成：\n已補登 ${data.fixed} 筆\n跳過 ${data.skipped} 筆：\n${reasons}`);
   }
@@ -4441,7 +4496,7 @@ async function loadMonthlyStats() {
     const anomalyTips = (r.anomaly_dates || []).slice(0, 5).map(a =>
       `<span style="display:inline-block;margin:1px 3px 1px 0;padding:1px 6px;border-radius:10px;font-size:11px;
        background:${ATYPE_BG[a.type]||ATYPE_BG.default};color:${ATYPE_COLOR[a.type]||ATYPE_COLOR.default}">
-       ${a.date} ${escHtml(a.label)}</span>`).join('');
+       ${rocDate(a.date)} ${escHtml(a.label)}</span>`).join('');
     const moreCount = (r.anomaly_dates || []).length - 5;
     return `<tr>
       <td style="font-weight:600">${escHtml(r.name||'')}</td>
@@ -4465,7 +4520,7 @@ function exportMonthlyStats() {
   if (!_mstatsData.length) { showToast('請先查詢月統計資料', true); return; }
   const rows = [['姓名','案場','出勤天數','總工時','平均時數/天','遲到次數','早退次數','缺打卡次數','異常明細']];
   _mstatsData.forEach(r => {
-    const anomalyText = (r.anomaly_dates || []).map(a => `${a.date} ${a.label}`).join('; ');
+    const anomalyText = (r.anomaly_dates || []).map(a => `${rocDate(a.date)} ${a.label}`).join('; ');
     rows.push([
       r.name||'', r.department||'',
       r.days_worked||0, r.total_hm||'0h 0m', r.avg_hours_day||'—',
@@ -4754,6 +4809,13 @@ function openPunchStaffModal(id=null) {
     let field;
     if (f.field_type === 'date') {
       field = `<roc-date class="psm-cf" data-cf-name="${escHtml(f.name)}"></roc-date>`;
+    } else if (f.field_type === 'select') {
+      const opts = (f.field_options || []).slice();
+      if (v && !opts.includes(v)) opts.unshift(v);   // 保留舊值（選項變更後不遺失）
+      field = `<select class="form-input psm-cf" data-cf-name="${escHtml(f.name)}" style="font-family:'Noto Sans TC',sans-serif">`
+        + `<option value="">未選</option>`
+        + opts.map(o => `<option value="${escHtml(o)}"${o === v ? ' selected' : ''}>${escHtml(o)}</option>`).join('')
+        + `</select>`;
     } else {
       const t = f.field_type === 'number' ? 'number' : 'text';
       field = `<input class="form-input psm-cf" data-cf-name="${escHtml(f.name)}" type="${t}" value="${escHtml(v)}"${t === 'text' ? ` style="font-family:'Noto Sans TC',sans-serif"` : ''}>`;
@@ -4844,17 +4906,27 @@ function renderStaffSettings() {
     </div>`).join('') : '<div style="font-size:12px;color:var(--muted)">尚無案場，請在下方新增</div>';
 
   const fWrap = document.getElementById('ss-field-list');
-  const typeZh = { text: '文字', number: '數字', date: '日期' };
+  const typeZh = { text: '文字', number: '數字', date: '日期', select: '下拉' };
   fWrap.innerHTML = punchFieldDefs.length ? punchFieldDefs.map(f => `
-    <div style="display:flex;gap:8px;align-items:center">
-      <input class="form-input" value="${escHtml(f.name)}" id="ssf-${f.id}" style="flex:1;font-family:'Noto Sans TC',sans-serif">
-      <select class="form-input" id="ssft-${f.id}" style="width:90px">
-        ${['text','number','date'].map(t => `<option value="${t}"${f.field_type===t?' selected':''}>${typeZh[t]}</option>`).join('')}
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input class="form-input" value="${escHtml(f.name)}" id="ssf-${f.id}" style="flex:1;min-width:120px;font-family:'Noto Sans TC',sans-serif">
+      <select class="form-input" id="ssft-${f.id}" style="width:90px" onchange="_toggleRowFieldOpts(${f.id})">
+        ${['text','number','date','select'].map(t => `<option value="${t}"${f.field_type===t?' selected':''}>${typeZh[t]}</option>`).join('')}
       </select>
       <label class="fm-check" style="font-size:12px;padding:7px 10px"><input type="checkbox" id="ssfa-${f.id}"${f.active?' checked':''}> 啟用</label>
       <button class="btn btn-outline btn-sm" onclick="saveFieldDef(${f.id})">儲存</button>
       <button class="btn btn-danger btn-sm" onclick="deleteFieldDef(${f.id},'${escHtml(f.name)}')">刪除</button>
+      <input class="form-input" id="ssfo-${f.id}" placeholder="下拉選項，逗號分隔，例：S,M,L,XL" value="${escHtml((f.field_options||[]).join(', '))}" style="${f.field_type==='select'?'':'display:none;'}flex:1 1 100%;font-family:'Noto Sans TC',sans-serif">
     </div>`).join('') : '<div style="font-size:12px;color:var(--muted)">尚無自訂欄位，請在下方新增</div>';
+}
+function _toggleNewFieldOpts() {
+  const sel = document.getElementById('ss-field-type');
+  document.getElementById('ss-field-options').style.display = sel.value === 'select' ? '' : 'none';
+}
+function _toggleRowFieldOpts(id) {
+  const sel = document.getElementById('ssft-' + id);
+  const opt = document.getElementById('ssfo-' + id);
+  if (opt) opt.style.display = sel.value === 'select' ? '' : 'none';
 }
 async function _refreshSettingsData() {
   const [rDept, rDefs] = await Promise.all([
@@ -4888,18 +4960,24 @@ async function deleteDepartment(id, name) {
 async function addFieldDef() {
   const name = document.getElementById('ss-field-new').value.trim();
   const field_type = document.getElementById('ss-field-type').value;
+  const options = document.getElementById('ss-field-options').value;
   if (!name) { showToast('請輸入欄位名稱', 'error'); return; }
-  const { ok } = await api('/api/punch/field-defs', apiJSON({ name, field_type }));
+  if (field_type === 'select' && !options.trim()) { showToast('下拉欄位請至少填一個選項', 'error'); return; }
+  const { ok } = await api('/api/punch/field-defs', apiJSON({ name, field_type, options }));
   if (!ok) return;
   document.getElementById('ss-field-new').value = '';
+  document.getElementById('ss-field-options').value = '';
+  _toggleNewFieldOpts();
   showToast('欄位已新增', 'success'); await _refreshSettingsData();
 }
 async function saveFieldDef(id) {
   const name = document.getElementById('ssf-' + id).value.trim();
   const field_type = document.getElementById('ssft-' + id).value;
   const active = document.getElementById('ssfa-' + id).checked;
+  const options = (document.getElementById('ssfo-' + id) || {}).value || '';
   if (!name) { showToast('請輸入欄位名稱', 'error'); return; }
-  const { ok } = await api(`/api/punch/field-defs/${id}`, apiPUT({ name, field_type, active }));
+  if (field_type === 'select' && !options.trim()) { showToast('下拉欄位請至少填一個選項', 'error'); return; }
+  const { ok } = await api(`/api/punch/field-defs/${id}`, apiPUT({ name, field_type, active, options }));
   if (!ok) return;
   showToast('已儲存', 'success'); await _refreshSettingsData();
 }
@@ -5670,7 +5748,7 @@ async function saveShiftAssign(force=false) {
   if (!dates.length)    { showToast('請選擇至少一個日期', 'error'); return; }
   const { ok, data, status } = await api('/api/shifts/assignments', apiJSON({ staff_ids: staffIds, shift_type_id: shiftTypeId, dates, note, force }));
   if (!ok && data.blocked && !force) {
-    const blockedList = data.blocked.map(b => `${b.staff_name} ${b.date}`).join('\n');
+    const blockedList = data.blocked.map(b => `${b.staff_name} ${rocDate(b.date)}`).join('\n');
     if (confirm(`以下員工當日已有核准排休：\n${blockedList}\n\n確定要強制指派班別嗎？`)) { await saveShiftAssign(true); }
     return;
   }
@@ -5885,7 +5963,7 @@ async function loadShiftConflicts() {
       return `<tr style="background:${sc.bg}">
         <td style="font-size:12px;font-weight:600;color:${sc.color}">${typeLabel[c.type]||c.type}</td>
         <td><span style="font-size:11px;font-weight:700;color:${sc.color};padding:2px 6px;background:${sc.bg};border:1px solid ${sc.border};border-radius:4px">${sc.icon} ${sc.label}</span></td>
-        <td style="font-family:'DM Mono',monospace;font-size:12px">${c.date}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px">${rocDate(c.date)}</td>
         <td style="font-weight:600">${escHtml(c.staff_name)}</td>
         <td style="color:var(--muted);font-size:12px">${escHtml(c.shift_name||'—')}</td>
         <td style="font-size:12px;color:var(--text)">${escHtml(c.message)}</td>
@@ -6383,7 +6461,7 @@ async function showAnnualSchedule(staffId, staffName) {
     return `<tr style="${style}${s.is_current?'font-weight:700;':''}">
       <td style="padding:7px 12px">${s.label}</td>
       <td style="padding:7px 12px;font-family:'DM Mono',monospace;text-align:center">${s.days} 天</td>
-      <td style="padding:7px 12px;font-family:'DM Mono',monospace">${s.date_reached}</td>
+      <td style="padding:7px 12px;font-family:'DM Mono',monospace">${rocDate(s.date_reached)}</td>
       <td style="padding:7px 12px;font-size:11px">${s.is_current?'▶ 目前':s.is_past?'已達成':'未達成'}</td>
     </tr>`;
   }).join('');
@@ -6560,7 +6638,7 @@ async function openSalDetail(id) {
           <th style="padding:5px 8px;text-align:right;border-bottom:1px solid var(--border)">實際工時</th>
         </tr>
         ${data.punch_details.map(pd=>`<tr style="border-bottom:1px solid #f0f2f8">
-          <td style="padding:4px 8px;font-family:'DM Mono',monospace">${pd.date}</td>
+          <td style="padding:4px 8px;font-family:'DM Mono',monospace">${rocDate(pd.date)}</td>
           <td style="padding:4px 8px;text-align:center;color:var(--green)">${pd.clock_in}</td>
           <td style="padding:4px 8px;text-align:center;color:var(--red)">${pd.clock_out}</td>
           <td style="padding:4px 8px;text-align:center;color:var(--muted)">${pd.break_mins?pd.break_mins+'min':''}</td>
@@ -7110,7 +7188,7 @@ async function loadHolidays() {
     const tc  = HOLIDAY_TYPE_COLOR[h.holiday_type] || 'var(--muted)';
     const tl  = HOLIDAY_TYPE_LABEL[h.holiday_type] || h.holiday_type;
     return `<tr>
-      <td style="font-family:'DM Mono',monospace;font-weight:600">${h.date}</td>
+      <td style="font-family:'DM Mono',monospace;font-weight:600">${rocDate(h.date)}</td>
       <td style="color:${dt.getDay()===0?'var(--red)':dt.getDay()===6?'var(--accent)':'var(--muted)'}">${wd}</td>
       <td style="font-weight:600">${escHtml(h.name)}</td>
       <td><span style="font-size:11px;font-weight:700;color:${tc}">${tl}</span></td>
@@ -8924,7 +9002,7 @@ async function loadTaxReport() {
         <th style="text-align:right">金額</th><th style="text-align:right">稅額</th>
       </tr></thead>
       <tbody>${rows.map(r => `<tr>
-        <td style="font-family:'DM Mono',monospace;font-size:12px">${r.date}</td>
+        <td style="font-family:'DM Mono',monospace;font-size:12px">${rocDate(r.date)}</td>
         <td>${escHtml(r.title)}</td>
         <td style="font-size:12px;color:var(--muted)">${escHtml(r.vendor||'—')}</td>
         <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--muted)">${escHtml(r.invoice_no||'—')}</td>
@@ -9894,7 +9972,7 @@ async function renderAttendanceHeatmap(month) {
   data.days.forEach(day => {
     const pct = Math.round(day.attendance_rate * 100);
     const dateShort = day.date.slice(8);
-    html += `<div title="${day.date} 出勤 ${day.count}/${data.total_staff}（${pct}%）"
+    html += `<div title="${rocDate(day.date)} 出勤 ${day.count}/${data.total_staff}（${pct}%）"
       style="${cellStyle(day.attendance_rate)};border-radius:5px;padding:6px 4px;text-align:center;cursor:default;border:1px solid rgba(0,0,0,0.06)">
       <div style="font-size:12px;font-weight:600;color:var(--text)">${dateShort}</div>
       <div style="font-size:10px;color:var(--muted)">${pct}%</div>

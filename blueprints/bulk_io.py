@@ -149,7 +149,7 @@ def _active_field_defs(conn):
     """啟用中的自訂欄位定義（匯入匯出動態欄）"""
     try:
         return [dict(r) for r in conn.execute(
-            "SELECT name, field_type FROM staff_field_defs WHERE active=TRUE ORDER BY sort_order, id"
+            "SELECT name, field_type, field_options FROM staff_field_defs WHERE active=TRUE ORDER BY sort_order, id"
         ).fetchall()]
     except Exception:
         return []
@@ -278,7 +278,9 @@ def staff_import():
 
     with get_db() as conn:
         # 自訂欄位：表頭比對啟用中的欄位定義（固定欄位優先）
-        cf_types = {d['name']: d.get('field_type') for d in _active_field_defs(conn)}
+        _defs = _active_field_defs(conn)
+        cf_types = {d['name']: d.get('field_type') for d in _defs}
+        cf_opts  = {d['name']: (d.get('field_options') or []) for d in _defs}
         cf_idx = {}   # 欄位名 -> column index
         for i, h in enumerate(header):
             h = h.strip()
@@ -302,6 +304,9 @@ def staff_import():
                         errors.append(f'第 {rownum} 列：{cfname}「{v}」不是有效日期，該欄已略過')
                         continue
                     v = d
+                elif cf_types.get(cfname) == 'select' and cf_opts.get(cfname) and v not in cf_opts[cfname]:
+                    errors.append(f'第 {rownum} 列：{cfname}「{v}」不在允許選項（{"、".join(cf_opts[cfname])}），該欄已略過')
+                    continue
                 cf[cfname] = v
 
             name = val('name')

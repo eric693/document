@@ -263,7 +263,7 @@ html,body{min-height:100%;background:var(--navy);font-family:"Noto Sans TC",sans
       <div id="panel-sched" class="tab-body" style="display:none">
         <div class="month-row">
           <span style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">月份</span>
-          <input type="month" class="month-inp" id="month-picker" onchange="loadSchedMonth()">
+          <roc-month id="month-picker" onchange="loadSchedMonth()" data-input-class="month-inp"></roc-month>
         </div>
         <div class="quota-bar">
           <div>
@@ -303,7 +303,7 @@ html,body{min-height:100%;background:var(--navy);font-family:"Noto Sans TC",sans
       <div id="panel-schedule-view" class="tab-body" style="display:none">
         <div class="month-row">
           <span style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">月份</span>
-          <input type="month" class="month-inp" id="view-month-picker" onchange="loadScheduleView()">
+          <roc-month id="view-month-picker" onchange="loadScheduleView()" data-input-class="month-inp"></roc-month>
         </div>
         <div id="schedule-view-content"><div style="text-align:center;color:var(--muted);font-size:13px;padding:20px">請選擇月份</div></div>
       </div>
@@ -359,7 +359,7 @@ html,body{min-height:100%;background:var(--navy);font-family:"Noto Sans TC",sans
 
         <div class="month-row" style="margin-bottom:14px">
           <span style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">月份</span>
-          <input type="month" class="month-inp" id="leave-month-picker" onchange="loadMyLeaveHistory()">
+          <roc-month id="leave-month-picker" onchange="loadMyLeaveHistory()" data-input-class="month-inp"></roc-month>
         </div>
 
         <!-- 新增請假申請 -->
@@ -437,7 +437,7 @@ html,body{min-height:100%;background:var(--navy);font-family:"Noto Sans TC",sans
         <div id="payslip-bank-info" style="margin-bottom:14px"></div>
         <div class="month-row" style="margin-bottom:16px">
           <span style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">月份</span>
-          <input type="month" class="month-inp" id="payslip-month" onchange="loadMyPayslip()">
+          <roc-month id="payslip-month" onchange="loadMyPayslip()" data-input-class="month-inp"></roc-month>
         </div>
         <div id="payslip-wrap">
           <div style="text-align:center;color:var(--muted);font-size:13px;padding:40px">請選擇月份查看薪資單</div>
@@ -447,7 +447,7 @@ html,body{min-height:100%;background:var(--navy);font-family:"Noto Sans TC",sans
       <div id="panel-attendance" class="tab-body" style="display:none">
         <div class="month-row" style="margin-bottom:14px">
           <span style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.08em;text-transform:uppercase">月份</span>
-          <input type="month" class="month-inp" id="att-month-picker" onchange="loadAttendance()">
+          <roc-month id="att-month-picker" onchange="loadAttendance()" data-input-class="month-inp"></roc-month>
         </div>
         <div id="att-summary" style="display:flex;border-radius:12px;overflow:hidden;margin-bottom:14px;border:1.5px solid var(--border);background:#fff"></div>
         <div id="att-calendar"></div>
@@ -610,6 +610,26 @@ class RocDateInput extends HTMLElement {
   set value(v){ if(!this._built){ this._pending=v; return; } this._setIso(v||'',false); }
 }
 customElements.define('roc-date', RocDateInput);
+function isoToRocMonth(m){ if(!m) return ''; const x=String(m).match(/^(\d{4})-(\d{2})$/); return x?`民國${parseInt(x[1],10)-1911}年${x[2]}月`:''; }
+function rocMonthToIso(str){ const s=String(str||'').trim(); let m=s.match(/民?國?\s*(\d{1,4})\s*年\s*(\d{1,2})\s*月?/)||s.match(/^(\d{3,4})[-/.](\d{1,2})$/); if(!m) return ''; let y=parseInt(m[1],10),mo=parseInt(m[2],10); if(y<1911) y+=1911; if(mo<1||mo>12) return ''; return `${String(y).padStart(4,'0')}-${String(mo).padStart(2,'0')}`; }
+function rocMonth(m){ return isoToRocMonth(m)||(m||''); }
+class RocMonthInput extends HTMLElement {
+  connectedCallback(){ if(this._built) return; this._built=true;
+    const cls=this.getAttribute('data-input-class')||'fi'; this.style.display='block';
+    this.innerHTML=`<span style="display:flex;align-items:center;gap:4px"><input type="text" inputmode="numeric" class="${cls}" placeholder="民國 例 115/07" style="flex:1;margin-bottom:0"><input type="month" tabindex="-1" title="選擇月份" style="width:32px;flex:none;padding:2px;opacity:.6;margin-bottom:0"></span>`;
+    this._text=this.querySelector('input[type=text]'); this._pick=this.querySelector('input[type=month]');
+    const stop=e=>e.stopPropagation();
+    this._text.addEventListener('change',e=>{stop(e);this._fromText();});
+    this._text.addEventListener('blur',()=>this._fromText());
+    this._pick.addEventListener('change',e=>{stop(e);this._setIso(this._pick.value,true);});
+    if(this._pending!=null){ this._setIso(this._pending,false); this._pending=null; }
+  }
+  _fromText(){ if(this._text.value.trim()===''){ this._setIso('',true); return; } const iso=rocMonthToIso(this._text.value); if(!iso){ this._text.style.borderColor='#e11d48'; return; } this._setIso(iso,true); }
+  _setIso(iso,fire){ this._iso=iso||''; if(this._text){ this._text.value=this._iso?`${parseInt(this._iso.slice(0,4),10)-1911}/${this._iso.slice(5,7)}`:''; this._text.style.borderColor=''; } if(this._pick) this._pick.value=this._iso; if(fire) this.dispatchEvent(new Event('change',{bubbles:true})); }
+  get value(){ return this._iso||''; }
+  set value(v){ if(!this._built){ this._pending=v; return; } this._setIso(v||'',false); }
+}
+customElements.define('roc-month', RocMonthInput);
 const DAYS=['日','一','二','三','四','五','六'];
 const PLABEL={in:'上班打卡',out:'下班打卡',break_out:'休息開始',break_in:'休息結束'};
 const PLCLS={in:'lb-in',out:'lb-out',break_out:'lb-bout',break_in:'lb-bin'};
@@ -1650,7 +1670,7 @@ async function loadAnnualLeaveCard() {
           <div style="font-size:11px;color:var(--muted);margin-bottom:2px">下一里程碑</div>
           <div style="font-size:13px;font-weight:600;color:var(--navy)">
             ${esc(next.label)} → <span style="color:var(--accent)">${next.days} 天/年</span>
-            <span style="font-size:11px;color:var(--muted);margin-left:6px">（還有 ${diffDays} 天，${next.date_reached}）</span>
+            <span style="font-size:11px;color:var(--muted);margin-left:6px">（還有 ${diffDays} 天，${rocDate(next.date_reached)}）</span>
           </div>
         </div>`;
       }
@@ -1853,7 +1873,7 @@ async function showMyAnnualSchedule() {
       return `<tr style="${bg}${fw}">
         <td style="padding:9px 14px;${sc}">${s.label}</td>
         <td style="padding:9px 14px;font-family:'DM Mono',monospace;font-weight:700;text-align:center;${sc}">${s.days} 天</td>
-        <td style="padding:9px 14px;font-family:'DM Mono',monospace;font-size:12px;${sc}">${s.date_reached}</td>
+        <td style="padding:9px 14px;font-family:'DM Mono',monospace;font-size:12px;${sc}">${rocDate(s.date_reached)}</td>
         <td style="padding:9px 14px;font-size:12px;${sc}">${status}</td>
       </tr>`;
     }).join('');
@@ -2151,7 +2171,7 @@ function renderPayslip(data, wrap) {
   <div style="background:#fff;border-radius:12px;border:1.5px solid var(--border);overflow:hidden;margin-bottom:14px">
     <!-- 標題 -->
     <div style="background:var(--navy);padding:16px 20px;color:#fff">
-      <div style="font-size:16px;font-weight:700">${data.month?.replace('-','/')} 薪資單</div>
+      <div style="font-size:16px;font-weight:700">${rocMonth(data.month)} 薪資單</div>
       <div style="font-size:12px;opacity:.7;margin-top:3px">${esc(data.staff_name || '')} ${isHourly?'（時薪制）':'（月薪制）'}</div>
     </div>
     <!-- 出勤摘要 -->

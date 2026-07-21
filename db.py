@@ -270,6 +270,8 @@ def init_db():
             active     BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMPTZ DEFAULT NOW()
         )""",
+        # 下拉式（select）欄位的選項清單，值為 JSON 陣列 ["A","B",...]
+        "ALTER TABLE staff_field_defs ADD COLUMN IF NOT EXISTS field_options JSONB DEFAULT '[]'::jsonb",
         # 部門管理清單（首次建立時由現有員工部門自動 seed）
         """CREATE TABLE IF NOT EXISTS departments (
             id         SERIAL PRIMARY KEY,
