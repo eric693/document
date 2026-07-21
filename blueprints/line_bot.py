@@ -30,6 +30,54 @@ def _use_reply_token():
     return token
 
 
+def _norm_date(s):
+    """民國或西元日期字串 → 西元 ISO（YYYY-MM-DD）；無法解析回 None。
+    內部一律用西元 ISO 存取，僅顯示與輸入用民國。"""
+    import re
+    from datetime import date
+    m = re.match(r'^(\d{3,4})[-/.](\d{1,2})[-/.](\d{1,2})$', str(s).strip())
+    if not m:
+        return None
+    y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    if y < 1911:
+        y += 1911
+    try:
+        return date(y, mo, d).isoformat()
+    except ValueError:
+        return None
+
+
+def _norm_month(s):
+    """民國或西元 YYYY-MM → 西元 YYYY-MM；無法解析回 None。"""
+    import re
+    m = re.match(r'^(\d{3,4})[-/.](\d{1,2})$', str(s).strip())
+    if not m:
+        return None
+    y, mo = int(m.group(1)), int(m.group(2))
+    if y < 1911:
+        y += 1911
+    if not (1 <= mo <= 12):
+        return None
+    return f'{y:04d}-{mo:02d}'
+
+
+def _roc(v):
+    """西元 ISO 字串或 date → 民國顯示（115/07/21）；非日期原樣回傳。"""
+    import re
+    from datetime import date as _d, datetime as _dt
+    if isinstance(v, (_d, _dt)):
+        return f'{v.year - 1911}/{v.month:02d}/{v.day:02d}'
+    m = re.match(r'^(\d{4})-(\d{2})-(\d{2})', str(v))
+    return f'{int(m.group(1)) - 1911}/{m.group(2)}/{m.group(3)}' if m else str(v)
+
+
+def _roc_month(s):
+    """西元 YYYY-MM → 民國115年07月；非此格式原樣回傳。"""
+    import re
+    m = re.match(r'^(\d{4})-(\d{2})$', str(s))
+    return f'民國{int(m.group(1)) - 1911}年{m.group(2)}月' if m else str(s)
+
+
 def get_line_punch_config():
     try:
         with get_db() as conn:
@@ -391,7 +439,7 @@ def _do_line_punch(staff, user_id, lat, lng, forced_type, PUNCH_LABEL):
     _send_line_punch(user_id,
         f'✅ {label}成功\n'
         f'👤 {staff["name"]}\n'
-        f'🕐 {now.strftime("%Y/%m/%d %H:%M")}'
+        f'🕐 {_roc(now)} {now.strftime("%H:%M")}'
         f'{gps_info}')
 
 
@@ -475,7 +523,7 @@ def _line_query_salary(staff, user_id):
         return
     status_map = {'draft': '草稿', 'confirmed': '已確認', 'paid': '已發放'}
     _send_line_punch(user_id,
-        f'📊 {staff["name"]} {row["month"]} 薪資\n\n'
+        f'📊 {staff["name"]} {_roc_month(row["month"])} 薪資\n\n'
         f'底薪：NT$ {float(row["base_salary"] or 0):,.0f}\n'
         f'津貼：NT$ {float(row["allowance_total"] or 0):,.0f}\n'
         f'扣除：NT$ {float(row["deduction_total"] or 0):,.0f}\n'
@@ -493,7 +541,8 @@ def _line_submit_leave(staff, user_id, text):
     import re as _re_lv
     from datetime import date as _dlv, timedelta as _tdlv
     WDAY_LV = ['一', '二', '三', '四', '五', '六', '日']
-    parts = text.strip().split()
+    # 使用者可輸入民國或西元日期；內部一律正規化為西元 ISO
+    parts = [(_norm_date(p) or p) for p in text.strip().split()]
 
     # Step 1: only "請假" → Quick Reply with leave types + remaining balance
     if len(parts) == 1:
@@ -560,7 +609,7 @@ def _line_submit_leave(staff, user_id, text):
             {'label': '⏰ 自訂時段', 'text': f'請假 {leave_type_name} {date_str} 選開始'},
         ]
         _send_line_with_quick_reply(user_id,
-            f'🌿 請假 · {leave_type_name}\n日期：{date_str}\n\n請選擇時段：',
+            f'🌿 請假 · {leave_type_name}\n日期：{_roc(date_str)}\n\n請選擇時段：',
             items_period)
         return
 
@@ -577,8 +626,8 @@ def _line_submit_leave(staff, user_id, text):
             for t in common_starts
         ]
         _send_line_with_quick_reply(user_id,
-            f'🌿 請假 · {leave_type_name}\n日期：{date_str}\n\n請選擇開始時間：\n'
-            f'（或手動輸入：請假 {leave_type_name} {date_str} HH:MM）',
+            f'🌿 請假 · {leave_type_name}\n日期：{_roc(date_str)}\n\n請選擇開始時間：\n'
+            f'（或手動輸入：請假 {leave_type_name} {_roc(date_str)} HH:MM）',
             items_start)
         return
 
@@ -600,7 +649,7 @@ def _line_submit_leave(staff, user_id, text):
             for t, d in end_options
         ]
         _send_line_with_quick_reply(user_id,
-            f'🌿 請假 · {leave_type_name}\n日期：{date_str}　開始：{start_str}\n\n請選擇結束時間：',
+            f'🌿 請假 · {leave_type_name}\n日期：{_roc(date_str)}　開始：{start_str}\n\n請選擇結束時間：',
             items_end)
         return
 
@@ -634,7 +683,7 @@ def _line_submit_leave(staff, user_id, text):
         _dlv.fromisoformat(date_str1)
         _dlv.fromisoformat(date_str2)
     except ValueError:
-        _send_line_punch(user_id, f'日期格式錯誤，請使用 YYYY-MM-DD，例：{_dlv.today().isoformat()}')
+        _send_line_punch(user_id, f'日期格式錯誤，請用民國日期，例：{_roc(_dlv.today())}（西元 {_dlv.today().isoformat()} 亦可）')
         return
 
     with get_db() as conn:
@@ -710,7 +759,7 @@ def _line_submit_leave(staff, user_id, text):
     _send_line_punch(user_id,
         f'✅ 請假申請已送出\n\n'
         f'假別：{lt["name"]} {bal_str}\n'
-        f'日期：{date_str1}' + (f' ～ {date_str2}' if date_str2 != date_str1 else '') +
+        f'日期：{_roc(date_str1)}' + (f' ～ {_roc(date_str2)}' if date_str2 != date_str1 else '') +
         f'{period_label}\n'
         f'時數/天數：{duration_str}\n\n'
         f'申請號：#{row["id"]}，等待管理員審核。')
@@ -759,9 +808,7 @@ def _line_query_monthly_records(staff, user_id, text):
     parts = text.strip().split()
     month = None
     if len(parts) >= 2:
-        m = _rem.match(r'^(\d{4})-(\d{1,2})$', parts[1])
-        if m:
-            month = f"{m.group(1)}-{m.group(2).zfill(2)}"
+        month = _norm_month(parts[1])   # 接受民國或西元
     if not month:
         month = _dtm.now(TW).strftime('%Y-%m')
 
@@ -779,7 +826,7 @@ def _line_query_monthly_records(staff, user_id, text):
         return
 
     if not rows:
-        _send_line_punch(user_id, f'📋 {staff["name"]} {month}\n該月尚無打卡記錄。')
+        _send_line_punch(user_id, f'📋 {staff["name"]} {_roc_month(month)}\n該月尚無打卡記錄。')
         return
 
     WDAY = ['一', '二', '三', '四', '五', '六', '日']
@@ -830,7 +877,7 @@ def _line_query_monthly_records(staff, user_id, text):
     th, tm = divmod(total_mins, 60)
     total_str = f'{th}h{tm:02d}' if tm else f'{th}h'
     anomaly_str = f'｜異常 {anomaly_days} 天' if anomaly_days else ''
-    header = (f'📋 {staff["name"]} {month} 出勤\n'
+    header = (f'📋 {staff["name"]} {_roc_month(month)} 出勤\n'
               f'出勤 {len(days)} 天｜工時 {total_str}{anomaly_str}\n'
               + '─' * 20)
 
@@ -879,18 +926,19 @@ def _line_submit_overtime(staff, user_id, text):
         _line_overtime_start(staff, user_id)
         return
 
-    date_str = parts[1]
+    # 使用者可輸入民國或西元日期；內部一律正規化為西元 ISO
+    date_str = _norm_date(parts[1]) or parts[1]
     try:
         _dot.fromisoformat(date_str)
     except ValueError:
-        _send_line_punch(user_id, f'日期格式錯誤，請使用 YYYY-MM-DD，例：{_dot.today().isoformat()}')
+        _send_line_punch(user_id, f'日期格式錯誤，請用民國日期，例：{_roc(_dot.today())}（西元 {_dot.today().isoformat()} 亦可）')
         return
 
     if len(parts) == 2:
         start_options = ['08:00', '09:00', '17:00', '18:00', '19:00', '20:00', '21:00', '22:00']
         items = [{'label': t, 'text': f'申請加班 {date_str} {t}'} for t in start_options]
         _send_line_with_quick_reply(user_id,
-            f'⏰ 加班申請 · {date_str}\n\n請選擇開始時間：', items)
+            f'⏰ 加班申請 · {_roc(date_str)}\n\n請選擇開始時間：', items)
         return
 
     start_str = parts[2]
@@ -908,7 +956,7 @@ def _line_submit_overtime(staff, user_id, text):
         items = [{'label': f'至 {t}（+{d}h）', 'text': f'申請加班 {date_str} {start_str} {t}'}
                  for t, d in zip(end_options, [1, 1.5, 2, 2.5, 3, 4, 5, 6])]
         _send_line_with_quick_reply(user_id,
-            f'⏰ 加班申請 · {date_str} {start_str} 開始\n\n請選擇結束時間：', items)
+            f'⏰ 加班申請 · {_roc(date_str)} {start_str} 開始\n\n請選擇結束時間：', items)
         return
 
     end_str = parts[3].strip().split()[0]
@@ -953,7 +1001,7 @@ def _line_submit_overtime(staff, user_id, text):
 
     _send_line_punch(user_id,
         f'✅ 加班申請已送出\n\n'
-        f'日期：{date_str}\n'
+        f'日期：{_roc(date_str)}\n'
         f'時段：{start_str} ～ {end_str}（{hours:.1f} 小時）\n'
         f'申請編號：#{row["id"]}\n\n'
         '請等候管理員審核，審核結果將通知您。')
@@ -970,13 +1018,13 @@ def _line_show_help(staff, user_id):
         '🌿 查餘假 → 本年假期餘額\n'
         '💰 查薪資 → 最近薪資單\n'
         '📊 出勤紀錄 → 本月出勤明細\n'
-        '   出勤紀錄 2026-03 → 指定月份\n'
+        '   出勤紀錄 115-03 → 指定月份\n'
         '考核 → 最近績效考核\n\n'
         '─── 申請 ───\n'
         '📝 請假 [假別] [日期] → 送出請假\n'
-        '   範例：請假 特休 2026-04-01\n'
+        '   範例：請假 特休 115/04/01\n'
         '⏰ 申請加班 [日期] [時數] → 加班申請\n'
-        '   範例：申請加班 2026-04-05 3\n'
+        '   範例：申請加班 115/04/05 3\n'
         '🗂️ 假別 → 查看可用假別清單\n\n'
         '─── 其他 ───\n'
         '🔓 解除綁定')
